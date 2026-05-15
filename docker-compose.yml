@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: oidc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: oidc
+      POSTGRES_USER: oidc
+      POSTGRES_PASSWORD: oidc_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oidc -d oidc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: oidc-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oidc-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      OIDC_DATABASE_HOST: postgres
+      OIDC_DATABASE_PORT: "5432"
+      OIDC_REDIS_HOST: redis
+      OIDC_REDIS_PORT: "6379"
+    volumes:
+      - ./configs:/app/configs:ro
+
+volumes:
+  postgres_data:
+  redis_data:

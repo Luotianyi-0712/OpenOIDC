@@ -1,0 +1,77 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+/out/
+oidc-server
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace
+go.work
+go.work.sum
+
+# Dependency directories
+vendor/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Local config overrides
+configs/config.local.yaml
+configs/config.*.local.yaml
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+tmp/
+.cache/
+
+# Generated keys
+*.pem
+*.key
+!**/testdata/**/*.pem
+!**/testdata/**/*.key
+
+# OS / misc
+.air.toml
+__debug_bin*
+
+# SQLite runtime database files
+*.db
+*.db-shm
+*.db-wal
+data/*.db*
+!data/.gitkeep
+
+# Local AI / agent tooling
+.claude/
+.cursor/
+.agents/
+skills-lock.json
+
+# Embedded / built frontend artifacts (built from frontend/ on demand)
+internal/handler/static/

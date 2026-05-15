@@ -1,0 +1,145 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+  issuer: http://localhost:8080
+  public_url: http://localhost:8080
+  read_timeout: 15s
+  write_timeout: 15s
+  shutdown_timeout: 30s
+
+database:
+  driver: sqlite
+  dsn: data/oidc.db
+  host: localhost
+  port: 5432
+  user: oidc
+  password: oidc_secret
+  name: oidc
+  sslmode: disable
+  max_conns: 20
+  min_conns: 2
+  max_conn_lifetime: 1h
+  max_conn_idle_time: 30m
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+  min_idle_conns: 2
+
+jwt:
+  algorithm: RS256
+  access_token_ttl: 1h
+  refresh_token_ttl: 720h
+  id_token_ttl: 1h
+  auth_code_ttl: 10m
+  key_rotation_days: 30
+
+session:
+  cookie_name: oidc_session
+  cookie_domain: ""
+  cookie_secure: false
+  cookie_http_only: true
+  cookie_same_site: lax
+  ttl: 720h
+
+admin:
+  email: admin@example.com
+  password: change_me_now
+
+log:
+  level: info
+  format: json
+
+security:
+  password_min_length: 8
+  password_require_upper: true
+  password_require_lower: true
+  password_require_digit: true
+  password_require_symbol: false
+  max_login_attempts: 5
+  lockout_duration: 15m
+  bcrypt_cost: 12
+
+oauth2:
+  google:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    scopes: [openid, profile, email]
+    redirect_path: /oauth/callback/google
+  github:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    scopes: [read:user, user:email]
+    redirect_path: /oauth/callback/github
+  microsoft:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    tenant: common
+    scopes: [openid, profile, email]
+    redirect_path: /oauth/callback/microsoft
+  apple:
+    enabled: false
+    client_id: ""
+    team_id: ""
+    key_id: ""
+    private_key: ""
+    scopes: [name, email]
+    redirect_path: /oauth/callback/apple
+  facebook:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    scopes: [email, public_profile]
+    redirect_path: /oauth/callback/facebook
+  twitter:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    scopes: [tweet.read, users.read]
+    redirect_path: /oauth/callback/twitter
+  linkedin:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    scopes: [openid, profile, email]
+    redirect_path: /oauth/callback/linkedin
+  wechat:
+    enabled: false
+    app_id: ""
+    app_secret: ""
+    scopes: [snsapi_login]
+    redirect_path: /oauth/callback/wechat
+  qq:
+    enabled: false
+    app_id: ""
+    app_key: ""
+    scopes: [get_user_info]
+    redirect_path: /oauth/callback/qq
+  weibo:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    scopes: [email]
+    redirect_path: /oauth/callback/weibo
+  dingtalk:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    scopes: [openid]
+    redirect_path: /oauth/callback/dingtalk
+
+sms:
+  provider: mock
+  access_key: ""
+  access_secret: ""
+  sign_name: ""
+  template_code: ""
+  code_ttl: 5m
+  send_interval: 60s
+  daily_limit: 10

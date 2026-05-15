@@ -1,0 +1,20 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  public_url: "http://localhost:8080"
+  issuer: "http://localhost:8080"
+
+database:
+  driver: sqlite
+  dsn: "oidc.db"
+
+session:
+  cookie_name: "oidc_session"
+  cookie_secure: false
+  cookie_http_only: true
+  cookie_same_site: "lax"
+  ttl: "24h"
+
+log:
+  level: "debug"
+  format: "text"
