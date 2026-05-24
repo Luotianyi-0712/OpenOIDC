@@ -149,6 +149,7 @@ export default {
     github: '使用 GitHub 登录',
     google: '使用 Google 登录',
     wechat: '使用微信登录',
+    accountLocked: '由于登录失败次数过多，账户已被临时锁定。请稍后再试。',
   },
 
   // Register
@@ -455,6 +456,11 @@ export default {
     emailUnverified: '邮箱未验证',
     userClients: '该用户创建的接入应用',
     noUserClients: '这个用户还没有创建应用。',
+    resetPwd: '重置密码',
+    resetPassword: '重置密码',
+    resetPasswordHint: '为 {email} 设置新密码。用户需要使用新密码登录。',
+    newPassword: '新密码',
+    newPasswordPlaceholder: '请输入新密码',
   },
 
   // Admin: Clients
@@ -917,5 +923,15 @@ export default {
 
     changesTitle: '条款变更',
     changesDesc: '我们保留随时修改本条款的权利。当我们进行重大变更时，将更新本页面顶部的"最后更新"日期，并在可行的情况下通过电子邮件或平台内通知告知您。变更生效后继续使用服务即构成对修订条款的接受。',
+  },
+
+  // Password Policy
+  passwordPolicy: {
+    minLength: '至少 {n} 个字符',
+    requireUpper: '至少一个大写字母',
+    requireLower: '至少一个小写字母',
+    requireDigit: '至少一个数字',
+    requireSymbol: '至少一个特殊字符',
+    notMet: '密码不满足要求。',
   },
 }

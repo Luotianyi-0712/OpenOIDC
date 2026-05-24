@@ -60,6 +60,7 @@ func NewRouter(d Deps) *chi.Mux {
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public settings (login/registration config).
 		r.Get("/settings/public", d.AdminHandler.PublicSettings)
+		r.Get("/settings/password-policy", d.AdminHandler.PasswordPolicy)
 
 		// Auth (public, but rate limited).
 		r.Route("/auth", func(r chi.Router) {
@@ -131,6 +132,7 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Delete("/users/{id}", d.AdminHandler.DeleteUser)
 			r.Get("/users/{id}/clients", d.AdminHandler.ListUserClients)
 			r.Put("/users/{id}/security-level", d.AdminHandler.OverrideSecurityLevel)
+			r.Post("/users/{id}/reset-password", d.AdminHandler.ResetUserPassword)
 
 			r.Get("/clients", d.AdminHandler.ListClients)
 			r.Post("/clients", d.AdminHandler.CreateClient)

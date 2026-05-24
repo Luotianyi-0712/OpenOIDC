@@ -132,6 +132,12 @@ func (s *AuthService) Register(ctx context.Context, email, password, displayName
 
 func (s *AuthService) Login(ctx context.Context, email, password, ip, userAgent string) (*domain.UserSession, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
+
+	// Check login lockout before anything else.
+	if s.isLockedOut(ctx, email) {
+		return nil, ErrAccountLockedOut
+	}
+
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, port.ErrNotFound) {
@@ -145,6 +151,7 @@ func (s *AuthService) Login(ctx context.Context, email, password, ip, userAgent 
 		return nil, fmt.Errorf("verify password: %w", err)
 	}
 	if !ok {
+		s.recordFailedAttempt(ctx, email)
 		s.audit(ctx, &user.ID, "user.login_failed", "user", user.ID.String(), &ip, map[string]any{
 			"reason": "invalid_password",
 		})
@@ -157,6 +164,9 @@ func (s *AuthService) Login(ctx context.Context, email, password, ip, userAgent 
 	case domain.UserStatusDeleted:
 		return nil, ErrAccountDeleted
 	}
+
+	// Clear failed attempts on successful login.
+	s.clearFailedAttempts(ctx, email)
 
 	session, err := s.createSession(ctx, user.ID, ip, userAgent)
 	if err != nil {
@@ -172,6 +182,48 @@ func (s *AuthService) Login(ctx context.Context, email, password, ip, userAgent 
 	})
 
 	return session, nil
+}
+
+// isLockedOut checks if too many failed login attempts have occurred.
+func (s *AuthService) isLockedOut(ctx context.Context, email string) bool {
+	maxAttempts := s.cfg.Security.MaxLoginAttempts
+	if maxAttempts <= 0 {
+		return false // Lockout disabled.
+	}
+	key := "login_attempts:" + email
+	data, err := s.cache.Get(ctx, key)
+	if err != nil {
+		return false
+	}
+	count := int(data[0])
+	if len(data) >= 4 {
+		count = int(data[0]) | int(data[1])<<8 | int(data[2])<<16 | int(data[3])<<24
+	}
+	return count >= maxAttempts
+}
+
+// recordFailedAttempt increments the failed login counter.
+func (s *AuthService) recordFailedAttempt(ctx context.Context, email string) {
+	maxAttempts := s.cfg.Security.MaxLoginAttempts
+	if maxAttempts <= 0 {
+		return
+	}
+	lockoutDuration := s.cfg.Security.LockoutDuration
+	if lockoutDuration <= 0 {
+		lockoutDuration = 15 * time.Minute
+	}
+	key := "login_attempts:" + email
+	_, _ = s.cache.IncrementRateLimit(ctx, key, lockoutDuration)
+}
+
+// clearFailedAttempts removes the failed login counter after a successful login.
+func (s *AuthService) clearFailedAttempts(ctx context.Context, email string) {
+	maxAttempts := s.cfg.Security.MaxLoginAttempts
+	if maxAttempts <= 0 {
+		return
+	}
+	key := "login_attempts:" + email
+	_ = s.cache.Delete(ctx, key)
 }
 
 func (s *AuthService) Logout(ctx context.Context, sessionToken string) error {

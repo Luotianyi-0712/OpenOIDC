@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/ory/fosite"
@@ -19,6 +22,7 @@ type OIDCHandler struct {
 	clientSvc  *service.ClientService
 	accessCtrl *service.AccessControlService
 	sessionSvc *service.SessionService
+	cache      port.Cache
 	serverCfg  config.ServerConfig
 	loginURL   string
 }
@@ -43,6 +47,21 @@ func NewOIDCHandler(
 	}
 }
 
+// SetCache sets the cache dependency for storing consent challenges.
+func (h *OIDCHandler) SetCache(cache port.Cache) {
+	h.cache = cache
+}
+
+// consentChallenge stores the OIDC authorize request info so we can resume after user consent.
+type consentChallenge struct {
+	UserID      string   `json:"user_id"`
+	ClientID    string   `json:"client_id"`
+	ClientName  string   `json:"client_name"`
+	Scopes      []string `json:"scopes"`
+	RedirectURI string   `json:"redirect_uri"`
+	RequestURL  string   `json:"request_url"`
+}
+
 // Authorize handles GET /oauth2/authorize.
 func (h *OIDCHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -56,7 +75,7 @@ func (h *OIDCHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 	userID, err := mw.GetUserID(ctx)
 	if err != nil {
 		// Not logged in - redirect to login page with return_to.
-		redirect := h.loginURL + "?return_to=" + r.URL.RequestURI()
+		redirect := h.loginURL + "?return_to=" + url.QueryEscape(r.URL.RequestURI())
 		http.Redirect(w, r, redirect, http.StatusFound)
 		return
 	}
@@ -85,6 +104,10 @@ func (h *OIDCHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If a consent UI is needed, redirect to it with a challenge token.
+	// For now, we use auto-consent (skip the consent screen) since the ConsentAccept
+	// endpoint can be called by the frontend if needed.
+	// Auto-consent: grant all requested scopes and issue response.
 	for _, scope := range ar.GetRequestedScopes() {
 		ar.GrantScope(scope)
 	}
@@ -199,14 +222,84 @@ func (h *OIDCHandler) UserInfo(w http.ResponseWriter, r *http.Request) {
 	Raw(w, http.StatusOK, payload)
 }
 
-// ConsentAccept handles POST /api/v1/consent/accept. For now we use auto-consent in Authorize,
-// but this endpoint is provided so a UI flow can call it explicitly.
+// ConsentAccept handles POST /api/v1/consent/accept.
+// Stores consent and returns a redirect URI if a challenge was provided.
 func (h *OIDCHandler) ConsentAccept(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, map[string]any{"accepted": true})
+	var req struct {
+		ConsentChallenge string `json:"consent_challenge"`
+	}
+	if err := DecodeJSON(r, &req); err != nil {
+		// Empty body is fine - auto-consent mode.
+		JSON(w, http.StatusOK, map[string]any{"accepted": true})
+		return
+	}
+
+	if req.ConsentChallenge == "" || h.cache == nil {
+		JSON(w, http.StatusOK, map[string]any{"accepted": true})
+		return
+	}
+
+	// Look up the challenge.
+	data, err := h.cache.Get(r.Context(), "consent:"+req.ConsentChallenge)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_challenge", "consent challenge expired or invalid")
+		return
+	}
+	_ = h.cache.Delete(r.Context(), "consent:"+req.ConsentChallenge)
+
+	var challenge consentChallenge
+	if err := json.Unmarshal(data, &challenge); err != nil {
+		Error(w, http.StatusInternalServerError, "internal", "failed to unmarshal challenge")
+		return
+	}
+
+	// Redirect back to the authorize endpoint to complete the flow.
+	JSON(w, http.StatusOK, map[string]any{
+		"accepted":     true,
+		"redirect_uri": challenge.RequestURL,
+	})
 }
 
 // ConsentReject handles POST /api/v1/consent/reject.
 func (h *OIDCHandler) ConsentReject(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ConsentChallenge string `json:"consent_challenge"`
+	}
+	_ = DecodeJSON(r, &req)
+
+	if req.ConsentChallenge != "" && h.cache != nil {
+		data, err := h.cache.Get(r.Context(), "consent:"+req.ConsentChallenge)
+		if err == nil {
+			_ = h.cache.Delete(r.Context(), "consent:"+req.ConsentChallenge)
+			var challenge consentChallenge
+			if json.Unmarshal(data, &challenge) == nil {
+				JSON(w, http.StatusOK, map[string]any{
+					"rejected":     true,
+					"redirect_uri": challenge.RedirectURI + "?error=access_denied&error_description=user+denied+consent",
+				})
+				return
+			}
+		}
+	}
+
 	JSON(w, http.StatusOK, map[string]any{"rejected": true})
+}
+
+// storeConsentChallenge saves the authorize request so we can resume after consent.
+func (h *OIDCHandler) storeConsentChallenge(r *http.Request, challenge *consentChallenge) (string, error) {
+	token, err := generateRandomToken(24)
+	if err != nil {
+		return "", err
+	}
+	data, _ := json.Marshal(challenge)
+	if err := h.cache.Set(r.Context(), "consent:"+token, data, 10*time.Minute); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+// generateRandomToken is imported from the service package; reuse the helper here.
+func generateRandomToken(length int) (string, error) {
+	return service.GenerateRandomTokenExported(length)
 }
 

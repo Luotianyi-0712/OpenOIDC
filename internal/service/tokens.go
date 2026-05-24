@@ -22,6 +22,11 @@ func generateRandomToken(n int) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// GenerateRandomTokenExported is an exported wrapper around generateRandomToken.
+func GenerateRandomTokenExported(n int) (string, error) {
+	return generateRandomToken(n)
+}
+
 func generateClientID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

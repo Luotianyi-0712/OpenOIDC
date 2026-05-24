@@ -51,7 +51,12 @@ async function onSubmit() {
     const returnTo = (route.query.return_to as string) || '/me'
     router.push(returnTo)
   } catch (e: any) {
-    error.value = e.message || 'Login failed. Please try again.'
+    const msg = e.message || 'Login failed. Please try again.'
+    if (msg.includes('locked') || msg.includes('too many')) {
+      error.value = t('login.accountLocked')
+    } else {
+      error.value = msg
+    }
     resetTurnstile()
   } finally {
     loading.value = false

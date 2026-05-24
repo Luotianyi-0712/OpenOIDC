@@ -149,6 +149,7 @@ export default {
     github: 'Continue with GitHub',
     google: 'Continue with Google',
     wechat: 'Continue with WeChat',
+    accountLocked: 'Account temporarily locked due to too many failed login attempts. Please try again later.',
   },
 
   // Register
@@ -414,7 +415,7 @@ export default {
     },
   },
 
-  // Admin: Users
+  // Admin: Users - extended
   adminUsers: {
     searchPlaceholder: 'Search users...',
     allStatuses: 'All statuses',
@@ -459,6 +460,11 @@ export default {
     emailUnverified: 'Email not verified',
     userClients: 'Apps created by this user',
     noUserClients: 'This user has not created any apps.',
+    resetPwd: 'Reset Pwd',
+    resetPassword: 'Reset Password',
+    resetPasswordHint: 'Set a new password for {email}. The user will need to use this new password to log in.',
+    newPassword: 'New Password',
+    newPasswordPlaceholder: 'Enter new password',
   },
 
   // Admin: Clients
@@ -924,5 +930,15 @@ export default {
 
     changesTitle: 'Changes to Terms',
     changesDesc: 'We reserve the right to modify these Terms at any time. When we make material changes, we will update the "Last updated" date at the top of this page and, where practical, notify you via email or in-platform notification. Your continued use of the service after changes take effect constitutes acceptance of the revised Terms.',
+  },
+
+  // Password Policy
+  passwordPolicy: {
+    minLength: 'At least {n} characters',
+    requireUpper: 'At least one uppercase letter',
+    requireLower: 'At least one lowercase letter',
+    requireDigit: 'At least one number',
+    requireSymbol: 'At least one special character',
+    notMet: 'Password does not meet the requirements.',
   },
 }

@@ -206,6 +206,32 @@ func (h *AdminHandler) OverrideSecurityLevel(w http.ResponseWriter, r *http.Requ
 	JSON(w, http.StatusOK, map[string]any{"updated": true})
 }
 
+type resetUserPasswordRequest struct {
+	NewPassword string `json:"new_password"`
+}
+
+func (h *AdminHandler) ResetUserPassword(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_id", err.Error())
+		return
+	}
+	var req resetUserPasswordRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if req.NewPassword == "" {
+		Error(w, http.StatusBadRequest, "invalid_input", "new_password is required")
+		return
+	}
+	if err := h.adminSvc.ResetUserPassword(r.Context(), id, req.NewPassword); err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"reset": true})
+}
+
 // ---------------- Clients ----------------
 
 type createClientRequest struct {
@@ -749,6 +775,43 @@ func (h *AdminHandler) PublicSettings(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, result)
 }
 
+// PasswordPolicy returns the password requirements for display on registration/change forms.
+func (h *AdminHandler) PasswordPolicy(w http.ResponseWriter, r *http.Request) {
+	// Retrieve password policy settings (with defaults from security config key pattern).
+	minLength := 8
+	requireUpper := false
+	requireLower := false
+	requireDigit := false
+	requireSymbol := false
+
+	// Try reading from settings repo (dynamically configured).
+	if s, err := h.adminSvc.GetSetting(r.Context(), "password_min_length"); err == nil && s.Value != "" {
+		if v, e := strconv.Atoi(s.Value); e == nil && v > 0 {
+			minLength = v
+		}
+	}
+	if s, err := h.adminSvc.GetSetting(r.Context(), "password_require_upper"); err == nil {
+		requireUpper = s.Value == "true"
+	}
+	if s, err := h.adminSvc.GetSetting(r.Context(), "password_require_lower"); err == nil {
+		requireLower = s.Value == "true"
+	}
+	if s, err := h.adminSvc.GetSetting(r.Context(), "password_require_digit"); err == nil {
+		requireDigit = s.Value == "true"
+	}
+	if s, err := h.adminSvc.GetSetting(r.Context(), "password_require_symbol"); err == nil {
+		requireSymbol = s.Value == "true"
+	}
+
+	JSON(w, http.StatusOK, map[string]any{
+		"min_length":     minLength,
+		"require_upper":  requireUpper,
+		"require_lower":  requireLower,
+		"require_digit":  requireDigit,
+		"require_symbol": requireSymbol,
+	})
+}
+
 type updateSettingRequest struct {
 	Value       string `json:"value"`
 	Description string `json:"description"`
@@ -1018,6 +1081,12 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get active sessions count.
+	var totalSessions int64
+	if h.sessionRepo != nil {
+		totalSessions, _ = h.sessionRepo.CountActive(r.Context())
+	}
+
 	// Get latest 5 audit log entries.
 	recentEvents, _, err := h.adminSvc.ListAuditLogs(r.Context(), port.ListAuditOptions{Offset: 0, Limit: 5})
 	if err != nil {
@@ -1032,7 +1101,7 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{
 		"total_users":    totalUsers,
 		"total_clients":  totalClients,
-		"total_sessions": 0,
+		"total_sessions": totalSessions,
 		"recent_events":  recent,
 	})
 }

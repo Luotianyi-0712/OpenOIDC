@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/api/client'
-import { Loader2, Check, BadgeCheck, AtSign, KeyRound, UserPen, ImagePlus, Mail } from 'lucide-vue-next'
+import { Loader2, Check, BadgeCheck, AtSign, KeyRound, UserPen, ImagePlus, Mail, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { usePasswordPolicy } from '@/composables/usePasswordPolicy'
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const { policy, hasRequirements, validate } = usePasswordPolicy()
 
 // Profile form
 const displayName = ref('')
@@ -27,6 +29,8 @@ const newPassword = ref('')
 const passwordLoading = ref(false)
 const passwordMsg = ref('')
 const passwordError = ref('')
+
+const newPasswordErrors = computed(() => newPassword.value ? validate(newPassword.value) : [])
 
 // Email verification
 const verificationSending = ref(false)
@@ -91,6 +95,10 @@ async function updateAlias() {
 async function changePassword() {
   passwordMsg.value = ''
   passwordError.value = ''
+  if (newPasswordErrors.value.length > 0) {
+    passwordError.value = t('passwordPolicy.notMet')
+    return
+  }
   passwordLoading.value = true
   try {
     await api.put('/me/password', {
@@ -290,6 +298,34 @@ async function changePassword() {
             autocomplete="new-password"
             class="w-full px-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
           />
+          <!-- Password policy hints -->
+          <div v-if="hasRequirements && newPassword" class="mt-2 space-y-1">
+            <div class="flex items-center gap-1.5 text-xs" :class="newPassword.length >= policy.min_length ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="newPassword.length >= policy.min_length" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.minLength', { n: policy.min_length }) }}
+            </div>
+            <div v-if="policy.require_upper" class="flex items-center gap-1.5 text-xs" :class="/[A-Z]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="/[A-Z]/.test(newPassword)" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.requireUpper') }}
+            </div>
+            <div v-if="policy.require_lower" class="flex items-center gap-1.5 text-xs" :class="/[a-z]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="/[a-z]/.test(newPassword)" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.requireLower') }}
+            </div>
+            <div v-if="policy.require_digit" class="flex items-center gap-1.5 text-xs" :class="/[0-9]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="/[0-9]/.test(newPassword)" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.requireDigit') }}
+            </div>
+            <div v-if="policy.require_symbol" class="flex items-center gap-1.5 text-xs" :class="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(newPassword)" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.requireSymbol') }}
+            </div>
+          </div>
         </div>
         <div>
           <div

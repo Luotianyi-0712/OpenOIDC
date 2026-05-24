@@ -8,6 +8,7 @@ var (
 	ErrInvalidCredentials        = errors.New("invalid credentials")
 	ErrAccountSuspended          = errors.New("account suspended")
 	ErrAccountDeleted            = errors.New("account deleted")
+	ErrAccountLockedOut          = errors.New("account temporarily locked due to too many failed login attempts")
 	ErrEmailNotVerified          = errors.New("email not verified")
 	ErrProviderDisabled          = errors.New("provider disabled")
 	ErrAlreadyBound              = errors.New("already bound")

@@ -71,6 +71,7 @@ type SessionRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	DeleteExpired(ctx context.Context) error
 	DeleteByUser(ctx context.Context, userID uuid.UUID) error
+	CountActive(ctx context.Context) (int64, error)
 }
 
 type ProviderConfigRepository interface {

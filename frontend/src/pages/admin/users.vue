@@ -2,7 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { Search, Pencil, Trash2, Loader2, ShieldCheck, X, Plus, Eye, Monitor } from 'lucide-vue-next'
+import { Search, Pencil, Trash2, Loader2, ShieldCheck, X, Plus, Eye, Monitor, KeyRound } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -92,6 +92,11 @@ const securityUserId = ref('')
 const showDeleteModal = ref(false)
 const deletingUser = ref<User | null>(null)
 const deleting = ref(false)
+
+const showResetPasswordModal = ref(false)
+const resetPasswordUser = ref<User | null>(null)
+const resetPasswordForm = ref({ new_password: '' })
+const resettingPassword = ref(false)
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -240,6 +245,26 @@ async function deleteUser() {
   }
 }
 
+function openResetPassword(user: User) {
+  resetPasswordUser.value = user
+  resetPasswordForm.value = { new_password: '' }
+  showResetPasswordModal.value = true
+}
+
+async function resetPassword() {
+  if (!resetPasswordUser.value) return
+  resettingPassword.value = true
+  error.value = ''
+  try {
+    await api.post(`/admin/users/${resetPasswordUser.value.id}/reset-password`, resetPasswordForm.value)
+    showResetPasswordModal.value = false
+  } catch (e: any) {
+    error.value = e.message
+  } finally {
+    resettingPassword.value = false
+  }
+}
+
 function prevPage() {
   if (offset.value > 0) {
     offset.value = Math.max(0, offset.value - limit.value)
@@ -351,6 +376,9 @@ function statusLabel(status: string) {
                 </button>
                 <button @click="openSecurityLevel(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
                   <ShieldCheck class="w-3 h-3" /> {{ $t('adminUsers.level') }}
+                </button>
+                <button @click="openResetPassword(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
+                  <KeyRound class="w-3 h-3" /> {{ $t('adminUsers.resetPwd') }}
                 </button>
                 <button @click="confirmDelete(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-destructive/5 transition-colors text-destructive flex items-center gap-1">
                   <Trash2 class="w-3 h-3" /> {{ $t('delete') }}
@@ -571,6 +599,28 @@ function statusLabel(status: string) {
             <Loader2 v-if="deleting" class="w-4 h-4 animate-spin" /> {{ $t('delete') }}
           </button>
         </div>
+      </div>
+    </div>
+
+    <div v-if="showResetPasswordModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showResetPasswordModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold">{{ $t('adminUsers.resetPassword') }}</h2>
+          <button @click="showResetPasswordModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
+        </div>
+        <p class="text-sm text-muted-foreground mb-5">{{ $t('adminUsers.resetPasswordHint', { email: resetPasswordUser?.email || '' }) }}</p>
+        <form @submit.prevent="resetPassword" class="flex flex-col gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1.5">{{ $t('adminUsers.newPassword') }}</label>
+            <input v-model="resetPasswordForm.new_password" type="password" required minlength="6" :placeholder="$t('adminUsers.newPasswordPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+          </div>
+          <div class="flex justify-end gap-2 mt-2">
+            <button type="button" @click="showResetPasswordModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
+            <button type="submit" :disabled="resettingPassword" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+              <Loader2 v-if="resettingPassword" class="w-4 h-4 animate-spin" /> {{ $t('adminUsers.resetPwd') }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

@@ -365,3 +365,34 @@ func (s *AdminService) ListAuditLogs(ctx context.Context, opts port.ListAuditOpt
 	}
 	return s.auditRepo.ListLogs(ctx, opts)
 }
+
+// ResetUserPassword allows an admin to force-reset a user's password.
+func (s *AdminService) ResetUserPassword(ctx context.Context, userID uuid.UUID, newPassword string) error {
+	if len(newPassword) < 6 {
+		return fmt.Errorf("%w: password must be at least 6 characters", ErrInvalidInput)
+	}
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, port.ErrNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("lookup user: %w", err)
+	}
+	hash, err := hashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	if err := s.userRepo.UpdatePassword(ctx, user.ID, hash); err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+	rt := "user"
+	rid := userID.String()
+	_ = s.auditRepo.CreateLog(ctx, &domain.AuditLog{
+		ID:           uuid.New(),
+		Action:       "admin.user_password_reset",
+		ResourceType: &rt,
+		ResourceID:   &rid,
+		CreatedAt:    time.Now().UTC(),
+	})
+	return nil
+}

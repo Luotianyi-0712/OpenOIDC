@@ -116,3 +116,13 @@ func (r *SessionRepo) DeleteByUser(ctx context.Context, userID uuid.UUID) error 
 	)
 	return err
 }
+
+func (r *SessionRepo) CountActive(ctx context.Context) (int64, error) {
+	now := time.Now().UTC()
+	var count int64
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM user_sessions WHERE revoked_at IS NULL AND expires_at > ?`,
+		now,
+	).Scan(&count)
+	return count, err
+}

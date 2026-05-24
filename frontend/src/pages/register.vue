@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Mail, Lock, User, Loader2 } from 'lucide-vue-next'
+import { Mail, Lock, User, Loader2, Check, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePublicConfig, getProviderIcon, isGoogleProvider, GOOGLE_SVG } from '@/composables/usePublicConfig'
 import { useTurnstile } from '@/composables/useTurnstile'
+import { usePasswordPolicy } from '@/composables/usePasswordPolicy'
 
 const { t } = useI18n()
 
@@ -14,6 +15,7 @@ const auth = useAuthStore()
 
 const { providers, settings, loaded } = usePublicConfig()
 const { token: turnstileToken, containerId: turnstileId, reset: resetTurnstile, renderWidget } = useTurnstile(() => settings.value.turnstile_site_key)
+const { policy, hasRequirements, validate } = usePasswordPolicy()
 
 const displayName = ref('')
 const email = ref('')
@@ -21,12 +23,19 @@ const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
+const passwordErrors = computed(() => password.value ? validate(password.value) : [])
+const passwordValid = computed(() => password.value.length > 0 && passwordErrors.value.length === 0)
+
 function socialLogin(provider: string) {
   window.location.href = `/api/v1/social/${provider}/begin?return_to=/`
 }
 
 async function onSubmit() {
   error.value = ''
+  if (passwordErrors.value.length > 0) {
+    error.value = t('passwordPolicy.notMet')
+    return
+  }
   loading.value = true
   try {
     await auth.register(email.value, password.value, displayName.value, turnstileToken.value || undefined)
@@ -137,6 +146,34 @@ async function onSubmit() {
               :placeholder="t('register.passwordPlaceholder')"
               class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
             />
+          </div>
+          <!-- Password policy hints -->
+          <div v-if="hasRequirements && password" class="mt-2 space-y-1">
+            <div class="flex items-center gap-1.5 text-xs" :class="password.length >= policy.min_length ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="password.length >= policy.min_length" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.minLength', { n: policy.min_length }) }}
+            </div>
+            <div v-if="policy.require_upper" class="flex items-center gap-1.5 text-xs" :class="/[A-Z]/.test(password) ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="/[A-Z]/.test(password)" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.requireUpper') }}
+            </div>
+            <div v-if="policy.require_lower" class="flex items-center gap-1.5 text-xs" :class="/[a-z]/.test(password) ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="/[a-z]/.test(password)" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.requireLower') }}
+            </div>
+            <div v-if="policy.require_digit" class="flex items-center gap-1.5 text-xs" :class="/[0-9]/.test(password) ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="/[0-9]/.test(password)" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.requireDigit') }}
+            </div>
+            <div v-if="policy.require_symbol" class="flex items-center gap-1.5 text-xs" :class="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(password) ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(password)" class="w-3 h-3" />
+              <X v-else class="w-3 h-3" />
+              {{ $t('passwordPolicy.requireSymbol') }}
+            </div>
           </div>
         </div>
         <div v-if="settings.turnstile_site_key" :id="turnstileId" class="flex justify-center"></div>

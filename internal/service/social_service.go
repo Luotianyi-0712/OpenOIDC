@@ -285,6 +285,11 @@ func (s *SocialService) CompleteSocialLogin(ctx context.Context, provider string
 		}
 
 		if info.Email != "" {
+			// Check email domain whitelist for social registration.
+			if err := s.checkEmailDomainAllowed(ctx, info.Email); err != nil {
+				return nil, nil, err
+			}
+
 			user, err = s.userRepo.GetByEmail(ctx, strings.ToLower(info.Email))
 			if err != nil && !errors.Is(err, port.ErrNotFound) {
 				return nil, nil, fmt.Errorf("lookup user by email: %w", err)
@@ -410,6 +415,30 @@ func (s *SocialService) isSettingEnabled(ctx context.Context, key string) bool {
 		return true
 	}
 	return setting.Value != "false"
+}
+
+// checkEmailDomainAllowed validates that the email domain is in the allowed list.
+// If the setting is empty/unset, all domains are allowed.
+func (s *SocialService) checkEmailDomainAllowed(ctx context.Context, email string) error {
+	if s.settingsRepo == nil {
+		return nil
+	}
+	setting, err := s.settingsRepo.Get(ctx, "allowed_email_domains")
+	if err != nil || setting.Value == "" {
+		return nil // No restriction.
+	}
+	parts := strings.SplitN(email, "@", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("%w: invalid email format", ErrInvalidInput)
+	}
+	domain := strings.ToLower(parts[1])
+	for _, d := range strings.Split(setting.Value, ",") {
+		d = strings.ToLower(strings.TrimSpace(d))
+		if d != "" && d == domain {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: email domain not allowed", ErrInvalidInput)
 }
 
 func (s *SocialService) audit(ctx context.Context, userID *uuid.UUID, action, resourceType, resourceID string, ip *string, details map[string]any) {

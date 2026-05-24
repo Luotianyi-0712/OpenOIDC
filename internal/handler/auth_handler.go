@@ -192,6 +192,8 @@ func mapAuthError(w http.ResponseWriter, err error) {
 		Error(w, http.StatusNotFound, "not_found", err.Error())
 	case errors.Is(err, service.ErrInvalidCredentials):
 		Error(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+	case errors.Is(err, service.ErrAccountLockedOut):
+		Error(w, http.StatusTooManyRequests, "account_locked", err.Error())
 	case errors.Is(err, service.ErrAccountSuspended):
 		Error(w, http.StatusForbidden, "account_suspended", "account is suspended")
 	case errors.Is(err, service.ErrAccountDeleted):

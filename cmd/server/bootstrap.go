@@ -176,6 +176,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	adminHandler := handler.NewAdminHandler(adminSvc, clientSvc, securitySvc, userRepo, socialRegistry, riskSvc, sessionRepo, bindingRepo, consentRepo)
 	loginURL := cfg.Server.BaseURL + "/login"
 	oidcHandler := handler.NewOIDCHandler(provider, userRepo, clientSvc, accessCtrl, sessionSvc, cfg.Server, loginURL)
+	oidcHandler.SetCache(cache)
 	wellKnownHandler := handler.NewWellKnownHandler(cfg.Server.BaseURL, signingKeyRepo)
 	devHandler := handler.NewDeveloperHandler(clientSvc, riskSvc, settingsRepo, consentRepo)
 	healthHandler := handler.NewHealthHandler(pgPool, redisClient)
