@@ -23,6 +23,11 @@ type registerRequest struct {
 	Email       string `json:"email"`
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
+	Code        string `json:"code"`
+}
+
+type sendRegisterCodeRequest struct {
+	Email string `json:"email"`
 }
 
 type loginRequest struct {
@@ -43,13 +48,26 @@ type resetPasswordRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
+func (h *AuthHandler) SendRegisterCode(w http.ResponseWriter, r *http.Request) {
+	var req sendRegisterCodeRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if err := h.authSvc.SendRegisterCode(r.Context(), req.Email); err != nil {
+		mapAuthError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"sent": true})
+}
+
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	user, err := h.authSvc.Register(r.Context(), req.Email, req.Password, req.DisplayName)
+	user, err := h.authSvc.Register(r.Context(), req.Email, req.Password, req.DisplayName, req.Code)
 	if err != nil {
 		mapAuthError(w, err)
 		return

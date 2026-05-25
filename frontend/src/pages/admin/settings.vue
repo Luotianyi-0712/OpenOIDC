@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { api } from '@/api/client'
-import { Pencil, Loader2, X, Mail, Save, Trash2 } from 'lucide-vue-next'
+import { Pencil, Loader2, X, Mail, Save } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 
@@ -16,10 +16,20 @@ interface Setting {
 
 const BOOL_SETTINGS = new Set([
   'registration_enabled',
+  'registration_email_verification_required',
   'password_login_enabled',
+  'email_verification_required',
+  'client_email_verification_default',
+  'allow_public_clients',
+  'turnstile_enabled',
   'social_login_enabled',
   'social_register_enabled',
   'social_binding_enabled',
+  'passkey_enabled',
+  'password_require_upper',
+  'password_require_lower',
+  'password_require_digit',
+  'password_require_symbol',
 ])
 
 const SMTP_KEYS = ['smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_from']
@@ -31,16 +41,21 @@ const DEDICATED_SETTING_KEYS = new Set([
   'developer_min_trust_level',
 ])
 
-const SETTING_LABELS = computed<Record<string, string>>(() => ({
-  registration_enabled: t('adminSettings.labels.registration_enabled'),
-  password_login_enabled: t('adminSettings.labels.password_login_enabled'),
-  social_login_enabled: t('adminSettings.labels.social_login_enabled'),
-  social_register_enabled: t('adminSettings.labels.social_register_enabled'),
-  social_binding_enabled: t('adminSettings.labels.social_binding_enabled'),
-}))
+function tOrFallback(path: string, fallback: string) {
+  const translated = t(path)
+  return translated === path ? fallback : translated
+}
+
+function settingLabel(key: string) {
+  return tOrFallback(`adminSettings.labels.${key}`, key)
+}
 
 function settingDescription(setting: Setting) {
-  return SETTING_LABELS.value[setting.key] || setting.description
+  return tOrFallback(`adminSettings.descriptions.${setting.key}`, '—')
+}
+
+function aliasRuleTypeLabel(type: string) {
+  return tOrFallback(`adminSettings.aliasRuleTypes.${type}`, type)
 }
 
 const settings = ref<Setting[]>([])
@@ -52,6 +67,7 @@ const showModal = ref(false)
 const editingKey = ref('')
 const saving = ref(false)
 const form = ref({ value: '', description: '' })
+const editingDescription = computed(() => tOrFallback(`adminSettings.descriptions.${editingKey.value}`, editingKey.value))
 
 // SMTP form
 const smtpForm = ref({ host: '', port: '465', username: '', password: '', from: '' })
@@ -83,10 +99,6 @@ const aliasAdding = ref(false)
 
 function isBoolSetting(key: string) {
   return BOOL_SETTINGS.has(key)
-}
-
-function isSmtpSetting(key: string) {
-  return SMTP_KEYS.includes(key)
 }
 
 function isDedicatedSetting(key: string) {
@@ -300,8 +312,8 @@ async function deleteAlias(id: string) {
             </tr>
             <tr v-for="setting in generalSettings" :key="setting.key" class="hover:bg-muted/30 transition-colors">
               <td class="px-4 py-3 font-medium">
-                <div class="font-mono text-xs">{{ setting.key }}</div>
-                <div v-if="SETTING_LABELS[setting.key]" class="text-[11px] text-muted-foreground mt-0.5">{{ SETTING_LABELS[setting.key] }}</div>
+                <div>{{ settingLabel(setting.key) }}</div>
+                <div class="font-mono text-[11px] text-muted-foreground mt-0.5">{{ setting.key }}</div>
               </td>
               <td class="px-4 py-3 max-w-64">
                 <label v-if="isBoolSetting(setting.key)" class="relative inline-flex items-center cursor-pointer">
@@ -425,7 +437,7 @@ async function deleteAlias(id: string) {
           <div v-for="alias in aliases" :key="alias.id" class="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-lg">
             <div>
               <code class="text-xs font-mono">{{ alias.pattern }}</code>
-              <span class="text-xs text-muted-foreground ml-2">{{ alias.restriction_type }}</span>
+              <span class="text-xs text-muted-foreground ml-2">{{ aliasRuleTypeLabel(alias.restriction_type) }}</span>
               <span v-if="alias.reason" class="text-xs text-muted-foreground ml-2">— {{ alias.reason }}</span>
             </div>
             <button @click="deleteAlias(alias.id)" class="text-xs text-destructive hover:underline">{{ $t('delete') }}</button>
@@ -465,7 +477,10 @@ async function deleteAlias(id: string) {
         <form @submit.prevent="saveSetting" class="flex flex-col gap-4">
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.key') }}</label>
-            <div class="px-3 py-2 bg-muted rounded-lg text-sm font-mono">{{ editingKey }}</div>
+            <div class="px-3 py-2 bg-muted rounded-lg text-sm">
+              <div class="font-medium">{{ settingLabel(editingKey) }}</div>
+              <div class="font-mono text-xs text-muted-foreground mt-0.5">{{ editingKey }}</div>
+            </div>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.value') }}</label>
@@ -473,7 +488,7 @@ async function deleteAlias(id: string) {
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminRules.description') }}</label>
-            <input v-model="form.description" type="text" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+            <div class="px-3 py-2 bg-muted rounded-lg text-sm text-muted-foreground">{{ editingDescription }}</div>
           </div>
           <div class="flex justify-end gap-2 mt-2">
             <button type="button" @click="showModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>

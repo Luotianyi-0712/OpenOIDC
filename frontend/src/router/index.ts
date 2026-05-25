@@ -47,6 +47,7 @@ const router = createRouter({
         { path: '', component: () => import('@/pages/developer/index.vue') },
         { path: 'create', component: () => import('@/pages/developer/create.vue') },
         { path: 'apps/:id', component: () => import('@/pages/developer/apps/[id].vue') },
+        { path: 'apps/:id/users', component: () => import('@/pages/developer/apps/[id]/users.vue') },
       ],
     },
     {

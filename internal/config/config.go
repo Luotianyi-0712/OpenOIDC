@@ -22,6 +22,7 @@ type Config struct {
 	SMS            SMSConfig
 	SMTP           SMTPConfig
 	Secrets        SecretsConfig
+	WebAuthn       WebAuthnConfig       `mapstructure:"webauthn"`
 }
 
 type ServerConfig struct {
@@ -145,6 +146,12 @@ type SecretsConfig struct {
 	ClientSecretEncryptionKey string `mapstructure:"client_secret_encryption_key"`
 }
 
+type WebAuthnConfig struct {
+	RPID          string `mapstructure:"rp_id"`
+	RPOrigin      string `mapstructure:"rp_origin"`
+	RPDisplayName string `mapstructure:"rp_display_name"`
+}
+
 func Load() (*Config, error) {
 	v := viper.New()
 	v.SetConfigName("config")
@@ -216,4 +223,5 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("social_auth_sync.interval", "1h")
 	v.SetDefault("social_auth_sync.batch_size", 100)
 	v.SetDefault("secrets.client_secret_encryption_key", "dev-client-secret-encryption-key")
+	v.SetDefault("webauthn.rp_display_name", "OIDC Platform")
 }

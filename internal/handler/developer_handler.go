@@ -303,6 +303,185 @@ func (h *DeveloperHandler) RotateSecret(w http.ResponseWriter, r *http.Request) 
 	JSON(w, http.StatusOK, map[string]any{"client_secret": secret})
 }
 
+func (h *DeveloperHandler) ListAppUsers(w http.ResponseWriter, r *http.Request) {
+	client, ok := h.requireOwnedClient(w, r)
+	if !ok {
+		return
+	}
+	if h.consentRepo == nil {
+		Error(w, http.StatusNotImplemented, "not_implemented", "consent repository not available")
+		return
+	}
+
+	offset := parseIntDefault(r.URL.Query().Get("offset"), 0)
+	limit := parseIntDefault(r.URL.Query().Get("limit"), 20)
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	search := r.URL.Query().Get("q")
+	if strings.TrimSpace(search) == "" {
+		search = r.URL.Query().Get("search")
+	}
+
+	users, total, err := h.consentRepo.ListClientUsers(r.Context(), client, search, offset, limit)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	PaginatedJSON(w, http.StatusOK, users, total, offset, limit)
+}
+
+func (h *DeveloperHandler) BlockAppUser(w http.ResponseWriter, r *http.Request) {
+	client, ok := h.requireOwnedClient(w, r)
+	if !ok {
+		return
+	}
+	targetID, ok := h.requireAppUser(w, r, client)
+	if !ok {
+		return
+	}
+
+	rules, err := h.clientSvc.ListAccessRules(r.Context(), client.ID)
+	if err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	for _, rule := range rules {
+		if domain.AccessRuleType(rule.RuleType) == domain.AccessRuleUserDeny && strings.EqualFold(rule.Value, targetID.String()) {
+			JSON(w, http.StatusOK, map[string]any{"blocked": true})
+			return
+		}
+	}
+
+	if _, err := h.clientSvc.AddAccessRule(r.Context(), client.ID, string(domain.AccessRuleUserDeny), targetID.String()); err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"blocked": true})
+}
+
+func (h *DeveloperHandler) UnblockAppUser(w http.ResponseWriter, r *http.Request) {
+	client, ok := h.requireOwnedClient(w, r)
+	if !ok {
+		return
+	}
+	targetID, ok := h.requireAppUser(w, r, client)
+	if !ok {
+		return
+	}
+
+	rules, err := h.clientSvc.ListAccessRules(r.Context(), client.ID)
+	if err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	for _, rule := range rules {
+		if domain.AccessRuleType(rule.RuleType) == domain.AccessRuleUserDeny && strings.EqualFold(rule.Value, targetID.String()) {
+			if err := h.clientSvc.RemoveAccessRule(r.Context(), rule.ID); err != nil {
+				mapAdminError(w, err)
+				return
+			}
+		}
+	}
+	JSON(w, http.StatusOK, map[string]any{"blocked": false})
+}
+
+func (h *DeveloperHandler) ReportAppUser(w http.ResponseWriter, r *http.Request) {
+	client, ok := h.requireOwnedClient(w, r)
+	if !ok {
+		return
+	}
+	targetID, ok := h.requireAppUser(w, r, client)
+	if !ok {
+		return
+	}
+
+	var req devReportUserRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	h.reportAppUser(w, r, client.ID, targetID, req.Reason, req.Category)
+}
+
+func (h *DeveloperHandler) requireOwnedClient(w http.ResponseWriter, r *http.Request) (*domain.OIDCClient, bool) {
+	callerID, err := mw.GetUserID(r.Context())
+	if err != nil {
+		Error(w, http.StatusUnauthorized, "unauthenticated", err.Error())
+		return nil, false
+	}
+	appID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_id", err.Error())
+		return nil, false
+	}
+	client, err := h.clientSvc.GetClient(r.Context(), appID)
+	if err != nil {
+		mapAdminError(w, err)
+		return nil, false
+	}
+	if client.OwnerUserID == nil || *client.OwnerUserID != callerID {
+		Error(w, http.StatusNotFound, "not_found", "not found")
+		return nil, false
+	}
+	return client, true
+}
+
+func (h *DeveloperHandler) requireAppUser(w http.ResponseWriter, r *http.Request, client *domain.OIDCClient) (uuid.UUID, bool) {
+	rawUID := chi.URLParam(r, "uid")
+	if strings.TrimSpace(rawUID) == "" {
+		rawUID = r.URL.Query().Get("user_id")
+	}
+	targetID, err := uuid.Parse(rawUID)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_input", "invalid user id")
+		return uuid.Nil, false
+	}
+	if h.userRepo != nil {
+		if _, err := h.userRepo.GetByID(r.Context(), targetID); err != nil {
+			mapAdminError(w, err)
+			return uuid.Nil, false
+		}
+	}
+	if h.consentRepo == nil {
+		Error(w, http.StatusNotImplemented, "not_implemented", "consent repository not available")
+		return uuid.Nil, false
+	}
+	apps, err := h.consentRepo.ListAuthorizedApps(r.Context(), targetID)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "internal", err.Error())
+		return uuid.Nil, false
+	}
+	for _, app := range apps {
+		if app.ClientID == client.ClientID {
+			return targetID, true
+		}
+	}
+	Error(w, http.StatusForbidden, "not_authorized", "target user has not authorized this app")
+	return uuid.Nil, false
+}
+
+func (h *DeveloperHandler) reportAppUser(w http.ResponseWriter, r *http.Request, appID, targetID uuid.UUID, reason, category string) {
+	callerID, err := mw.GetUserID(r.Context())
+	if err != nil {
+		Error(w, http.StatusUnauthorized, "unauthenticated", err.Error())
+		return
+	}
+	if h.riskSvc == nil {
+		Error(w, http.StatusNotImplemented, "not_implemented", "risk service not available")
+		return
+	}
+	report, err := h.riskSvc.ReportUser(r.Context(), appID, callerID, targetID, reason, category)
+	if err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	JSON(w, http.StatusCreated, report)
+}
+
 // getIssuer reads the "issuer" setting from the settings repo, with a sensible fallback.
 func (h *DeveloperHandler) getIssuer(ctx context.Context) string {
 	setting, err := h.settingsRepo.Get(ctx, "issuer")

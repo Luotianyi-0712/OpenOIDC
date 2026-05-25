@@ -158,6 +158,9 @@ function actorDisplay(entry: AuditEntry): string {
               <div class="text-xs">
                 <span v-if="entry.user_email" class="font-medium">{{ entry.user_email }}</span>
                 <span v-else class="text-muted-foreground font-mono">{{ entry.user_id || '-' }}</span>
+                <div v-if="entry.user_email && entry.user_id" class="text-muted-foreground font-mono mt-0.5">
+                  {{ entry.user_id }}
+                </div>
               </div>
             </td>
             <td class="px-4 py-3">

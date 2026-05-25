@@ -39,6 +39,7 @@ const (
 	AccessRuleEmailDeny        AccessRuleType = "email_deny"
 	AccessRuleIPAllow          AccessRuleType = "ip_allow"
 	AccessRuleIPDeny           AccessRuleType = "ip_deny"
+	AccessRuleUserDeny         AccessRuleType = "user_deny"
 )
 
 type ClientAccessRule struct {
@@ -47,4 +48,15 @@ type ClientAccessRule struct {
 	RuleType  string    `json:"rule_type"`
 	Value     string    `json:"value"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type DeveloperAppUserSummary struct {
+	UID           uuid.UUID `json:"uid"`
+	DisplayName   string    `json:"display_name"`
+	Email         string    `json:"email"`
+	SecurityLevel int       `json:"security_level"`
+	Providers     []string  `json:"providers"`
+	Blocked       bool      `json:"blocked"`
+	GrantedAt     time.Time `json:"granted_at"`
+	LastUsedAt    time.Time `json:"last_used_at"`
 }

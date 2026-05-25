@@ -23,6 +23,7 @@ type Deps struct {
 	DeveloperHandler *handler.DeveloperHandler
 	WellKnownHandler *handler.WellKnownHandler
 	HealthHandler    *handler.HealthHandler
+	PasskeyHandler   *handler.PasskeyHandler
 	SessionService   *service.SessionService
 	UserRepo         port.UserRepository
 	SettingsRepo     port.SettingsRepository
@@ -68,12 +69,15 @@ func NewRouter(d Deps) *chi.Mux {
 				r.Use(mw.DynamicRateLimit(d.Cache, d.SettingsRepo, 30, time.Minute))
 			}
 			r.Use(mw.Turnstile(d.SettingsRepo))
+			r.Post("/register/code", d.AuthHandler.SendRegisterCode)
 			r.Post("/register", d.AuthHandler.Register)
 			r.Post("/login", d.AuthHandler.Login)
 			r.Post("/logout", d.AuthHandler.Logout)
 			r.Post("/verify-email", d.AuthHandler.VerifyEmail)
 			r.Post("/forgot-password", d.AuthHandler.ForgotPassword)
 			r.Post("/reset-password", d.AuthHandler.ResetPassword)
+			r.Post("/passkey/begin", d.PasskeyHandler.BeginLogin)
+			r.Post("/passkey/finish", d.PasskeyHandler.FinishLogin)
 		})
 
 		// Public: list enabled social providers (no auth needed).
@@ -103,6 +107,12 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Get("/me/authorized-apps", d.UserInfoHandler.ListAuthorizedApps)
 			r.Delete("/me/authorized-apps/{clientId}", d.UserInfoHandler.RevokeAuthorizedApp)
 
+			r.Post("/me/passkeys/register/begin", d.PasskeyHandler.BeginRegister)
+			r.Post("/me/passkeys/register/finish", d.PasskeyHandler.FinishRegister)
+			r.Get("/me/passkeys", d.PasskeyHandler.ListPasskeys)
+			r.Delete("/me/passkeys/{id}", d.PasskeyHandler.DeletePasskey)
+			r.Put("/me/passkeys/{id}", d.PasskeyHandler.RenamePasskey)
+
 			r.Get("/consent/context", d.OIDCHandler.ConsentContext)
 			r.Post("/consent/accept", d.OIDCHandler.ConsentAccept)
 			r.Post("/consent/reject", d.OIDCHandler.ConsentReject)
@@ -119,6 +129,10 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Put("/apps/{id}", d.DeveloperHandler.UpdateApp)
 			r.Delete("/apps/{id}", d.DeveloperHandler.DeleteApp)
 			r.Post("/apps/{id}/rotate-secret", d.DeveloperHandler.RotateSecret)
+			r.Get("/apps/{id}/users", d.DeveloperHandler.ListAppUsers)
+			r.Post("/apps/{id}/users/{uid}/block", d.DeveloperHandler.BlockAppUser)
+			r.Delete("/apps/{id}/users/{uid}/block", d.DeveloperHandler.UnblockAppUser)
+			r.Post("/apps/{id}/users/{uid}/report", d.DeveloperHandler.ReportAppUser)
 			r.Post("/apps/{id}/report-user", d.DeveloperHandler.ReportUser)
 		})
 
@@ -134,6 +148,8 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Put("/users/{id}", d.AdminHandler.UpdateUser)
 			r.Delete("/users/{id}", d.AdminHandler.DeleteUser)
 			r.Get("/users/{id}/clients", d.AdminHandler.ListUserClients)
+			r.Get("/users/{id}/passkeys", d.AdminHandler.ListUserPasskeys)
+			r.Delete("/users/{id}/passkeys/{passkey_id}", d.AdminHandler.DeleteUserPasskey)
 			r.Put("/users/{id}/security-level", d.AdminHandler.OverrideSecurityLevel)
 			r.Post("/users/{id}/reset-password", d.AdminHandler.ResetUserPassword)
 			r.Delete("/users/{id}/sessions/{session_id}", d.AdminHandler.RevokeUserSession)
@@ -157,7 +173,10 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Post("/security-rules/recompute", d.AdminHandler.RecomputeSecurityLevels)
 
 			r.Get("/providers", d.AdminHandler.ListProviders)
+			r.Post("/providers", d.AdminHandler.CreateProvider)
+			r.Get("/providers/{provider}", d.AdminHandler.GetProvider)
 			r.Put("/providers/{provider}", d.AdminHandler.UpdateProvider)
+			r.Delete("/providers/{provider}", d.AdminHandler.DeleteProvider)
 
 			r.Get("/alias-restrictions", d.AdminHandler.ListAliasRestrictions)
 			r.Post("/alias-restrictions", d.AdminHandler.CreateAliasRestriction)

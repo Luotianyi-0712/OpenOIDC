@@ -84,10 +84,16 @@ export const useAuthStore = defineStore('auth', () => {
     await fetchDeveloperStatus()
   }
 
-  async function register(email: string, password: string, display_name: string, turnstileToken?: string) {
+  async function sendRegisterCode(email: string, turnstileToken?: string) {
     const headers: Record<string, string> = {}
     if (turnstileToken) headers['X-Turnstile-Token'] = turnstileToken
-    await api.post('/auth/register', { email, password, display_name }, headers)
+    await api.post('/auth/register/code', { email }, headers)
+  }
+
+  async function register(email: string, password: string, display_name: string, code: string, turnstileToken?: string) {
+    const headers: Record<string, string> = {}
+    if (turnstileToken) headers['X-Turnstile-Token'] = turnstileToken
+    await api.post('/auth/register', { email, password, display_name, code }, headers)
   }
 
   async function logout() {
@@ -96,5 +102,5 @@ export const useAuthStore = defineStore('auth', () => {
     developerStatus.value = null
   }
 
-  return { user, loading, developerMinTrustLevel, developerStatus, isLoggedIn, isAdmin, isSuperAdmin, isDeveloper, canShowDeveloperConsole, canCreateDeveloperApp, fetchUser, fetchPublicSettings, fetchDeveloperStatus, login, register, logout }
+  return { user, loading, developerMinTrustLevel, developerStatus, isLoggedIn, isAdmin, isSuperAdmin, isDeveloper, canShowDeveloperConsole, canCreateDeveloperApp, fetchUser, fetchPublicSettings, fetchDeveloperStatus, login, sendRegisterCode, register, logout }
 })

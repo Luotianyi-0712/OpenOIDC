@@ -2,11 +2,12 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Mail, Lock, Loader2 } from 'lucide-vue-next'
+import { Mail, Lock, Loader2, Fingerprint } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePublicConfig, getProviderIcon, isGoogleProvider, GOOGLE_SVG } from '@/composables/usePublicConfig'
 import { useToastStore } from '@/stores/toast'
 import { useTurnstile } from '@/composables/useTurnstile'
+import { usePasskey } from '@/composables/usePasskey'
 
 const { t } = useI18n()
 
@@ -22,6 +23,17 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+
+const { loading: passkeyLoading, error: passkeyError, loginWithPasskey } = usePasskey()
+
+async function handlePasskeyLogin() {
+  error.value = ''
+  const returnTo = (route.query.return_to as string) || '/me'
+  const ok = await loginWithPasskey(returnTo)
+  if (!ok && passkeyError.value && passkeyError.value !== 'cancelled') {
+    error.value = passkeyError.value
+  }
+}
 
 onMounted(() => {
   if (route.query.registered === '1') {
@@ -80,6 +92,19 @@ async function onSubmit() {
     >
       {{ error }}
     </div>
+
+    <!-- Passkey login -->
+    <button
+      v-if="settings.passkey_enabled"
+      type="button"
+      :disabled="passkeyLoading"
+      class="w-full border border-border rounded-lg py-2.5 px-4 text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2.5 mb-2.5"
+      @click="handlePasskeyLogin"
+    >
+      <Loader2 v-if="passkeyLoading" class="w-4 h-4 animate-spin" />
+      <Fingerprint v-else class="w-[18px] h-[18px]" />
+      {{ $t('login.passkey') }}
+    </button>
 
     <!-- Social buttons (dynamic from backend) -->
     <div v-if="settings.social_login_enabled && providers.length" class="flex flex-col gap-2.5">

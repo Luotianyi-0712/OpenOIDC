@@ -45,7 +45,44 @@ func NewAuthService(
 	}
 }
 
-func (s *AuthService) Register(ctx context.Context, email, password, displayName string) (*domain.User, error) {
+func (s *AuthService) SendRegisterCode(ctx context.Context, email string) error {
+	if !s.isSettingEnabled(ctx, "registration_enabled") {
+		return ErrRegistrationDisabled
+	}
+	if !s.isSettingEnabled(ctx, "registration_email_verification_required") {
+		return nil
+	}
+
+	email = strings.ToLower(strings.TrimSpace(email))
+	if _, err := mail.ParseAddress(email); err != nil {
+		return ErrInvalidEmail
+	}
+	if err := s.validateEmailDomain(ctx, email); err != nil {
+		return err
+	}
+
+	existing, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil && !errors.Is(err, port.ErrNotFound) {
+		return fmt.Errorf("lookup user: %w", err)
+	}
+	if existing != nil {
+		return ErrAlreadyExists
+	}
+
+	code, err := generateNumericCode(6)
+	if err != nil {
+		return err
+	}
+	if err := s.cache.Set(ctx, registerCodeKey(email), []byte(code), 10*time.Minute); err != nil {
+		return fmt.Errorf("store register code: %w", err)
+	}
+	if s.emailSender != nil {
+		return s.emailSender.SendRegistrationCode(ctx, email, code)
+	}
+	return nil
+}
+
+func (s *AuthService) Register(ctx context.Context, email, password, displayName, code string) (*domain.User, error) {
 	if !s.isSettingEnabled(ctx, "registration_enabled") {
 		return nil, ErrRegistrationDisabled
 	}
@@ -54,28 +91,18 @@ func (s *AuthService) Register(ctx context.Context, email, password, displayName
 	if _, err := mail.ParseAddress(email); err != nil {
 		return nil, ErrInvalidEmail
 	}
-	if err := s.validatePassword(password); err != nil {
+	if err := s.validatePassword(ctx, password); err != nil {
+		return nil, err
+	}
+	if err := s.validateEmailDomain(ctx, email); err != nil {
 		return nil, err
 	}
 
-	// Check email domain whitelist.
-	if s.settingsRepo != nil {
-		if setting, err := s.settingsRepo.Get(ctx, "allowed_email_domains"); err == nil && setting.Value != "" {
-			allowed := false
-			parts := strings.SplitN(email, "@", 2)
-			if len(parts) == 2 {
-				domain := strings.ToLower(parts[1])
-				for _, d := range strings.Split(setting.Value, ",") {
-					d = strings.ToLower(strings.TrimSpace(d))
-					if d != "" && d == domain {
-						allowed = true
-						break
-					}
-				}
-			}
-			if !allowed {
-				return nil, fmt.Errorf("%w: email domain not allowed", ErrInvalidInput)
-			}
+	requireRegisterCode := s.isSettingEnabled(ctx, "registration_email_verification_required")
+	if requireRegisterCode {
+		cachedCode, err := s.cache.Get(ctx, registerCodeKey(email))
+		if err != nil || strings.TrimSpace(code) == "" || string(cachedCode) != strings.TrimSpace(code) {
+			return nil, ErrInvalidToken
 		}
 	}
 
@@ -100,7 +127,7 @@ func (s *AuthService) Register(ctx context.Context, email, password, displayName
 	user := &domain.User{
 		ID:            uuid.New(),
 		Email:         email,
-		EmailVerified: false,
+		EmailVerified: true,
 		PasswordHash:  hash,
 		DisplayName:   displayName,
 		Status:        domain.UserStatusActive,
@@ -111,25 +138,12 @@ func (s *AuthService) Register(ctx context.Context, email, password, displayName
 	if err := s.userRepo.Create(ctx, user); err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
-
-	token, err := generateRandomToken(32)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.cache.SetEmailVerifyToken(ctx, token, user.ID, 24*time.Hour); err != nil {
-		return nil, fmt.Errorf("store email verify token: %w", err)
-	}
-
-	if s.emailSender != nil {
-		if err := s.emailSender.SendVerificationEmail(ctx, user.Email, token); err != nil {
-			// Log but don't fail registration.
-			_ = err
-		}
-	}
+	_ = s.cache.Delete(ctx, registerCodeKey(email))
 
 	s.audit(ctx, &user.ID, "user.register", "user", user.ID.String(), nil, map[string]any{
 		"email": email,
 	})
+	s.audit(ctx, &user.ID, "user.email_verified", "user", user.ID.String(), nil, nil)
 
 	return user, nil
 }
@@ -303,7 +317,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	if err != nil {
 		return ErrInvalidToken
 	}
-	if err := s.validatePassword(newPassword); err != nil {
+	if err := s.validatePassword(ctx, newPassword); err != nil {
 		return err
 	}
 	hash, err := hashPassword(newPassword)
@@ -353,7 +367,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, oldP
 	if !ok {
 		return ErrInvalidCredentials
 	}
-	if err := s.validatePassword(newPassword); err != nil {
+	if err := s.validatePassword(ctx, newPassword); err != nil {
 		return err
 	}
 	hash, err := hashPassword(newPassword)
@@ -410,27 +424,38 @@ func (s *AuthService) isSettingEnabled(ctx context.Context, key string) bool {
 	return setting.Value != "false"
 }
 
-func (s *AuthService) validatePassword(password string) error {
-	min := s.cfg.Security.PasswordMinLength
-	if min <= 0 {
-		min = 8
+func registerCodeKey(email string) string {
+	return "register_code:" + email
+}
+
+func (s *AuthService) validateEmailDomain(ctx context.Context, email string) error {
+	if s.settingsRepo == nil {
+		return nil
 	}
-	if len(password) < min {
-		return ErrPasswordTooWeak
+	setting, err := s.settingsRepo.Get(ctx, "allowed_email_domains")
+	if err != nil || setting.Value == "" {
+		return nil
 	}
-	if s.cfg.Security.PasswordRequireUpper && !containsAny(password, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
-		return ErrPasswordTooWeak
+	allowed := false
+	parts := strings.SplitN(email, "@", 2)
+	if len(parts) == 2 {
+		domain := strings.ToLower(parts[1])
+		for _, d := range strings.Split(setting.Value, ",") {
+			d = strings.ToLower(strings.TrimSpace(d))
+			if d != "" && d == domain {
+				allowed = true
+				break
+			}
+		}
 	}
-	if s.cfg.Security.PasswordRequireLower && !containsAny(password, "abcdefghijklmnopqrstuvwxyz") {
-		return ErrPasswordTooWeak
-	}
-	if s.cfg.Security.PasswordRequireDigit && !containsAny(password, "0123456789") {
-		return ErrPasswordTooWeak
-	}
-	if s.cfg.Security.PasswordRequireSymbol && !containsAny(password, "!@#$%^&*()-_=+[]{};:,.<>/?\\|`~'\"") {
-		return ErrPasswordTooWeak
+	if !allowed {
+		return fmt.Errorf("%w: email domain not allowed", ErrInvalidInput)
 	}
 	return nil
+}
+
+func (s *AuthService) validatePassword(ctx context.Context, password string) error {
+	return ValidatePasswordByPolicy(password, ResolvePasswordPolicy(ctx, s.settingsRepo, s.cfg.Security))
 }
 
 func containsAny(s, chars string) bool {

@@ -509,7 +509,8 @@ func isValidAccessRuleType(t string) bool {
 		domain.AccessRuleEmailAllow,
 		domain.AccessRuleEmailDeny,
 		domain.AccessRuleIPAllow,
-		domain.AccessRuleIPDeny:
+		domain.AccessRuleIPDeny,
+		domain.AccessRuleUserDeny:
 		return true
 	}
 	return false

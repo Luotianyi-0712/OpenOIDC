@@ -172,8 +172,8 @@ func (r *UserRepo) List(ctx context.Context, opts port.ListUsersOptions) ([]*dom
 
 	if opts.Search != "" {
 		pattern := "%" + opts.Search + "%"
-		args = append(args, pattern, pattern)
-		where = append(where, "(email LIKE ? OR display_name LIKE ?)")
+		args = append(args, pattern, pattern, pattern)
+		where = append(where, "(id LIKE ? OR email LIKE ? OR display_name LIKE ?)")
 	}
 	if opts.Status != nil {
 		args = append(args, string(*opts.Status))

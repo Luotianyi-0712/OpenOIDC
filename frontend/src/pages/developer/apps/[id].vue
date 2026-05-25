@@ -5,7 +5,7 @@ import { api } from '@/api/client'
 import { useI18n } from 'vue-i18n'
 import {
   Loader2, Copy, Check, RefreshCw, Trash2, ArrowLeft, Save,
-  AlertTriangle, Eye, EyeOff, X,
+  AlertTriangle, Eye, EyeOff, X, Users,
 } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -353,9 +353,20 @@ const integrationItems = computed(() => {
       <!-- Section 2: Integration Info (Credentials + Endpoints) -->
       <div class="border border-border rounded-xl p-6 mb-6">
         <!-- User Count -->
-        <div v-if="app.user_count !== undefined" class="mb-5 pb-5 border-b border-border">
-          <div class="text-xs font-medium text-muted-foreground mb-1">{{ $t('developerApp.userCount') }}</div>
-          <div class="text-2xl font-semibold">{{ app.user_count }}</div>
+        <div class="mb-5 pb-5 border-b border-border">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <div class="text-xs font-medium text-muted-foreground mb-1">{{ $t('developerApp.userCount') }}</div>
+              <div class="text-2xl font-semibold">{{ app.user_count ?? '-' }}</div>
+            </div>
+            <router-link
+              :to="`/developer/apps/${appId}/users`"
+              class="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+            >
+              <Users class="w-4 h-4" />
+              {{ $t('developerApp.viewUsers') }}
+            </router-link>
+          </div>
         </div>
 
         <h3 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-1">{{ $t('developer.credentials') }}</h3>

@@ -117,3 +117,18 @@ func (r *ProviderConfigRepo) Upsert(ctx context.Context, pc *domain.ProviderConf
 	)
 	return err
 }
+
+func (r *ProviderConfigRepo) Delete(ctx context.Context, provider string) error {
+	res, err := r.db.ExecContext(ctx, `DELETE FROM provider_configs WHERE provider = ?`, provider)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return port.ErrNotFound
+	}
+	return nil
+}

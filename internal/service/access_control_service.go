@@ -45,7 +45,7 @@ func (s *AccessControlService) CheckAccess(ctx context.Context, client *domain.O
 		return false, "rule_lookup_failed"
 	}
 
-	var emailDomainAllow, emailAllow, emailDeny, ipAllow, ipDeny []string
+	var emailDomainAllow, emailAllow, emailDeny, ipAllow, ipDeny, userDeny []string
 	for _, r := range rules {
 		switch domain.AccessRuleType(r.RuleType) {
 		case domain.AccessRuleEmailDomainAllow:
@@ -58,6 +58,15 @@ func (s *AccessControlService) CheckAccess(ctx context.Context, client *domain.O
 			ipAllow = append(ipAllow, r.Value)
 		case domain.AccessRuleIPDeny:
 			ipDeny = append(ipDeny, r.Value)
+		case domain.AccessRuleUserDeny:
+			userDeny = append(userDeny, r.Value)
+		}
+	}
+
+	userID := user.ID.String()
+	for _, v := range userDeny {
+		if strings.EqualFold(strings.TrimSpace(v), userID) {
+			return false, "user_denied"
 		}
 	}
 

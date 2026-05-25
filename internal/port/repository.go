@@ -79,6 +79,7 @@ type ProviderConfigRepository interface {
 	Get(ctx context.Context, provider string) (*domain.ProviderConfig, error)
 	List(ctx context.Context) ([]*domain.ProviderConfig, error)
 	Upsert(ctx context.Context, pc *domain.ProviderConfig) error
+	Delete(ctx context.Context, provider string) error
 }
 
 type ListAuditOptions struct {
@@ -131,12 +132,24 @@ type RiskListRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
+type PasskeyRepository interface {
+	Create(ctx context.Context, cred *domain.PasskeyCredential) error
+	ListByUser(ctx context.Context, userID uuid.UUID) ([]*domain.PasskeyCredential, error)
+	GetByCredentialID(ctx context.Context, credentialID []byte) (*domain.PasskeyCredential, error)
+	UpdateSignCount(ctx context.Context, id uuid.UUID, count uint32) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	Rename(ctx context.Context, id uuid.UUID, name string) error
+	UpdateLastUsed(ctx context.Context, id uuid.UUID) error
+}
+
 // ConsentRepository provides read access to OAuth2 session/consent data.
 type ConsentRepository interface {
 	// ListAuthorizedApps returns apps a user has authorized (based on oauth2_sessions).
 	ListAuthorizedApps(ctx context.Context, userID uuid.UUID) ([]*domain.UserAuthorization, error)
 	// CountUniqueUsers returns the number of unique users who have authorized a given client.
 	CountUniqueUsers(ctx context.Context, clientID string) (int64, error)
+	// ListClientUsers returns summarized users who have authorized a given client.
+	ListClientUsers(ctx context.Context, client *domain.OIDCClient, search string, offset, limit int) ([]*domain.DeveloperAppUserSummary, int64, error)
 	// DeleteByUserAndClient revokes a user's authorization to a specific client.
 	DeleteByUserAndClient(ctx context.Context, userID uuid.UUID, clientID string) error
 }

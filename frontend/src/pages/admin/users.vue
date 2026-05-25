@@ -2,11 +2,13 @@
 import { ref, onMounted, watch } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
 import { Search, Pencil, Trash2, Loader2, ShieldCheck, X, Plus, Eye, Monitor, KeyRound } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const toast = useToastStore()
 
 interface User {
   id: string
@@ -75,6 +77,14 @@ interface AuditLog {
   created_at: string
 }
 
+interface AdminPasskey {
+  id: string
+  name: string
+  created_at: string
+  last_used_at?: string
+  transports?: string[]
+}
+
 const users = ref<User[]>([])
 const total = ref(0)
 const offset = ref(0)
@@ -108,7 +118,9 @@ const detailSessions = ref<UserSession[]>([])
 const detailBindings = ref<UserBinding[]>([])
 const detailRiskReports = ref<RiskReport[]>([])
 const detailAuditLogs = ref<AuditLog[]>([])
+const detailPasskeys = ref<AdminPasskey[]>([])
 const loadingDetail = ref(false)
+const passkeysLoading = ref(false)
 const actionLoading = ref('')
 
 const showSecurityModal = ref(false)
@@ -224,11 +236,13 @@ async function loadUserDetail(user: User) {
   detailBindings.value = []
   detailRiskReports.value = []
   detailAuditLogs.value = []
+  detailPasskeys.value = []
   loadingDetail.value = true
   try {
     const [clientsRes, detailRes] = await Promise.all([
       api.get<Client[]>(`/admin/users/${user.id}/clients`),
       api.get<any>(`/admin/users/${user.id}/detail`),
+      loadUserPasskeys(user.id),
     ])
     detailClients.value = clientsRes.data ?? []
     if (detailRes.data) {
@@ -249,6 +263,33 @@ async function openDetail(user: User) {
   detailUser.value = user
   showDetailModal.value = true
   await loadUserDetail(user)
+}
+
+async function loadUserPasskeys(userID: string) {
+  passkeysLoading.value = true
+  try {
+    const res = await api.get<AdminPasskey[]>(`/admin/users/${userID}/passkeys`)
+    detailPasskeys.value = res.data ?? []
+  } finally {
+    passkeysLoading.value = false
+  }
+}
+
+async function deleteUserPasskey(passkey: AdminPasskey) {
+  if (!detailUser.value) return
+  if (!window.confirm(t('adminUserDetail.confirmDeletePasskey'))) return
+  actionLoading.value = `passkey:${passkey.id}`
+  error.value = ''
+  try {
+    await api.del(`/admin/users/${detailUser.value.id}/passkeys/${encodeURIComponent(passkey.id)}`)
+    toast.success(t('adminUserDetail.deletePasskeySuccess'))
+    await loadUserPasskeys(detailUser.value.id)
+  } catch (e: any) {
+    error.value = e.message
+    toast.error(e.message)
+  } finally {
+    actionLoading.value = ''
+  }
 }
 
 async function revokeSession(session: UserSession) {
@@ -439,6 +480,7 @@ function statusLabel(status: string) {
           <tr v-for="user in users" :key="user.id" class="hover:bg-muted/30 transition-colors">
             <td class="px-4 py-3">
               <div class="font-medium">{{ user.email }}</div>
+              <div class="text-xs text-muted-foreground font-mono mt-0.5">{{ $t('adminUsers.uid') }} {{ user.id }}</div>
               <div class="text-xs text-muted-foreground">{{ user.display_name || $t('adminUsers.noDisplayName') }} · {{ user.email_verified ? $t('adminUsers.emailVerified') : $t('adminUsers.emailUnverified') }}</div>
             </td>
             <td class="px-4 py-3">
@@ -532,6 +574,7 @@ function statusLabel(status: string) {
           <button @click="showDetailModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
         </div>
         <div class="grid grid-cols-2 gap-4 text-sm mb-6">
+          <div class="col-span-2"><div class="text-muted-foreground">{{ $t('adminUsers.uid') }}</div><div class="font-mono text-xs break-all">{{ detailUser.id }}</div></div>
           <div><div class="text-muted-foreground">{{ $t('adminUsers.email') }}</div><div class="font-medium">{{ detailUser.email }}</div></div>
           <div><div class="text-muted-foreground">{{ $t('adminUsers.name') }}</div><div class="font-medium">{{ detailUser.display_name || '-' }}</div></div>
           <div><div class="text-muted-foreground">{{ $t('adminUsers.alias') }}</div><div class="font-medium">{{ detailUser.alias || '-' }}</div></div>
@@ -559,6 +602,35 @@ function statusLabel(status: string) {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="mt-6">
+          <div class="flex items-center gap-2 mb-3">
+            <KeyRound class="w-4 h-4 text-muted-foreground" />
+            <h3 class="font-medium">{{ $t('adminUserDetail.passkeys') }}</h3>
+          </div>
+          <div v-if="passkeysLoading" class="text-sm text-muted-foreground py-4">{{ $t('loading') }}</div>
+          <div v-else-if="detailPasskeys.length === 0" class="text-sm text-muted-foreground py-3 border border-dashed border-border rounded-lg text-center">{{ $t('adminUserDetail.noPasskeys') }}</div>
+          <div v-else class="border border-border rounded-lg overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminUserDetail.name') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.createdAt') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.lastUsed') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.transports') }}</th><th class="px-3 py-2">{{ $t('actions') }}</th></tr></thead>
+              <tbody class="divide-y divide-border">
+                <tr v-for="passkey in detailPasskeys" :key="passkey.id">
+                  <td class="px-3 py-2 font-medium">{{ passkey.name || passkey.id }}</td>
+                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(passkey.created_at) }}</td>
+                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ passkey.last_used_at ? formatDate(passkey.last_used_at) : $t('adminUserDetail.neverUsed') }}</td>
+                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ passkey.transports?.length ? passkey.transports.join(', ') : '-' }}</td>
+                  <td class="px-3 py-2">
+                    <button
+                      @click="deleteUserPasskey(passkey)"
+                      :disabled="actionLoading === `passkey:${passkey.id}`"
+                      class="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
+                    >{{ $t('adminUserDetail.deletePasskey') }}</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Sessions -->

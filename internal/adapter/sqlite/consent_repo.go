@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -73,6 +74,86 @@ func (r *ConsentRepo) CountUniqueUsers(ctx context.Context, clientID string) (in
 		return 0, err
 	}
 	return count, nil
+}
+
+func (r *ConsentRepo) ListClientUsers(ctx context.Context, client *domain.OIDCClient, search string, offset, limit int) ([]*domain.DeveloperAppUserSummary, int64, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	search = strings.TrimSpace(search)
+	pattern := "%" + search + "%"
+
+	where := `os.client_id = ? AND os.active = 1 AND os.session_type = 'access_token'
+		AND os.subject != ''
+		AND (os.expires_at IS NULL OR os.expires_at > datetime('now'))
+		AND u.deleted_at IS NULL
+		AND (? = '' OR u.id LIKE ? OR u.email LIKE ? OR u.display_name LIKE ?)`
+
+	var total int64
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT u.id)
+		 FROM oauth2_sessions os
+		 JOIN users u ON u.id = os.subject
+		 WHERE `+where,
+		client.ClientID, search, pattern, pattern, pattern,
+	).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT u.id, u.display_name, u.email, u.security_level,
+		        COALESCE(GROUP_CONCAT(DISTINCT sb.provider), '') AS providers,
+		        MAX(CASE WHEN car.id IS NULL THEN 0 ELSE 1 END) AS blocked,
+		        MIN(os.created_at) AS granted_at,
+		        MAX(os.created_at) AS last_used_at
+		 FROM oauth2_sessions os
+		 JOIN users u ON u.id = os.subject
+		 LEFT JOIN social_bindings sb ON sb.user_id = u.id AND sb.status = 'active'
+		 LEFT JOIN client_access_rules car ON car.client_id = ? AND car.rule_type = ? AND car.value = u.id
+		 WHERE `+where+`
+		 GROUP BY u.id, u.display_name, u.email, u.security_level
+		 ORDER BY last_used_at DESC
+		 LIMIT ? OFFSET ?`,
+		client.ID.String(), string(domain.AccessRuleUserDeny), client.ClientID, search, pattern, pattern, pattern, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	users := make([]*domain.DeveloperAppUserSummary, 0)
+	for rows.Next() {
+		var uid string
+		var providers string
+		var blocked int
+		var grantedAt, lastUsedAt sql.NullTime
+		item := &domain.DeveloperAppUserSummary{}
+		if err := rows.Scan(&uid, &item.DisplayName, &item.Email, &item.SecurityLevel, &providers, &blocked, &grantedAt, &lastUsedAt); err != nil {
+			return nil, 0, err
+		}
+		parsedUID, err := uuid.Parse(uid)
+		if err != nil {
+			continue
+		}
+		item.UID = parsedUID
+		if providers != "" {
+			item.Providers = strings.Split(providers, ",")
+		} else {
+			item.Providers = []string{}
+		}
+		item.Blocked = blocked > 0
+		if grantedAt.Valid {
+			item.GrantedAt = grantedAt.Time
+		}
+		if lastUsedAt.Valid {
+			item.LastUsedAt = lastUsedAt.Time
+		}
+		users = append(users, item)
+	}
+	return users, total, rows.Err()
 }
 
 // DeleteByUserAndClient removes all sessions for a user+client pair (revoke authorization).

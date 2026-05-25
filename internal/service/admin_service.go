@@ -9,11 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"net/mail"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/anthropic/oidc-platform/internal/config"
 	"github.com/anthropic/oidc-platform/internal/domain"
 	"github.com/anthropic/oidc-platform/internal/port"
 )
@@ -25,6 +27,8 @@ type AdminService struct {
 	aliasRepo       port.AliasRestrictionRepository
 	signingKeyRepo  port.SigningKeyRepository
 	auditRepo       port.AuditRepository
+	passkeyRepo     port.PasskeyRepository
+	securityCfg     config.SecurityConfig
 }
 
 func NewAdminService(
@@ -34,6 +38,8 @@ func NewAdminService(
 	aliasRepo port.AliasRestrictionRepository,
 	signingKeyRepo port.SigningKeyRepository,
 	auditRepo port.AuditRepository,
+	passkeyRepo port.PasskeyRepository,
+	securityCfg config.SecurityConfig,
 ) *AdminService {
 	return &AdminService{
 		userRepo:        userRepo,
@@ -42,6 +48,8 @@ func NewAdminService(
 		aliasRepo:       aliasRepo,
 		signingKeyRepo:  signingKeyRepo,
 		auditRepo:       auditRepo,
+		passkeyRepo:     passkeyRepo,
+		securityCfg:     securityCfg,
 	}
 }
 
@@ -78,8 +86,8 @@ func (s *AdminService) CreateUser(ctx context.Context, email, password, displayN
 	if _, err := mail.ParseAddress(email); err != nil {
 		return nil, ErrInvalidEmail
 	}
-	if len(password) < 6 {
-		return nil, fmt.Errorf("%w: password must be at least 6 characters", ErrInvalidInput)
+	if err := ValidatePasswordByPolicy(password, s.PasswordPolicy(ctx)); err != nil {
+		return nil, err
 	}
 
 	switch role {
@@ -220,6 +228,48 @@ func (s *AdminService) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (s *AdminService) ListUserPasskeys(ctx context.Context, userID uuid.UUID) ([]*domain.PasskeyCredential, error) {
+	if _, err := s.GetUser(ctx, userID); err != nil {
+		return nil, err
+	}
+	if s.passkeyRepo == nil {
+		return []*domain.PasskeyCredential{}, nil
+	}
+	return s.passkeyRepo.ListByUser(ctx, userID)
+}
+
+func (s *AdminService) DeleteUserPasskey(ctx context.Context, userID, passkeyID uuid.UUID) error {
+	if _, err := s.GetUser(ctx, userID); err != nil {
+		return err
+	}
+	if s.passkeyRepo == nil {
+		return ErrNotFound
+	}
+	creds, err := s.passkeyRepo.ListByUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("list passkeys: %w", err)
+	}
+	for _, cred := range creds {
+		if cred.ID == passkeyID {
+			if err := s.passkeyRepo.Delete(ctx, passkeyID); err != nil {
+				return fmt.Errorf("delete passkey: %w", err)
+			}
+			rt := "passkey"
+			rid := passkeyID.String()
+			_ = s.auditRepo.CreateLog(ctx, &domain.AuditLog{
+				ID:           uuid.New(),
+				Action:       "admin.user_passkey_deleted",
+				ResourceType: &rt,
+				ResourceID:   &rid,
+				Details:      map[string]any{"user_id": userID.String()},
+				CreatedAt:    time.Now().UTC(),
+			})
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
 func (s *AdminService) OverrideSecurityLevel(ctx context.Context, id uuid.UUID, level int) error {
 	if level < 0 {
 		return fmt.Errorf("%w: level must be >= 0", ErrInvalidInput)
@@ -263,9 +313,67 @@ func (s *AdminService) GetProvider(ctx context.Context, provider string) (*domai
 	return p, nil
 }
 
+func (s *AdminService) CreateProvider(ctx context.Context, pc *domain.ProviderConfig) error {
+	if pc == nil {
+		return fmt.Errorf("%w: provider config required", ErrInvalidInput)
+	}
+	pc.Provider = strings.TrimSpace(pc.Provider)
+	if !domain.IsValidCustomProviderKey(pc.Provider) {
+		return fmt.Errorf("%w: provider must start with custom_ or oauth_ and contain only lowercase letters, numbers, _ or -", ErrInvalidInput)
+	}
+	if existing, err := s.providerCfgRepo.Get(ctx, pc.Provider); err != nil && !errors.Is(err, port.ErrNotFound) {
+		return fmt.Errorf("lookup provider: %w", err)
+	} else if existing != nil {
+		return ErrAlreadyExists
+	}
+	pc.DisplayName = strings.TrimSpace(pc.DisplayName)
+	if pc.DisplayName == "" {
+		pc.DisplayName = pc.Provider
+	}
+	if pc.ExtraConfig == nil {
+		pc.ExtraConfig = make(map[string]any)
+	}
+	pc.ExtraConfig["type"] = domain.ProviderTypeCustomOAuth2
+	if err := validateCustomOAuth2ProviderConfig(pc); err != nil {
+		return err
+	}
+	if pc.SortOrder == 0 {
+		existing, err := s.providerCfgRepo.List(ctx)
+		if err != nil {
+			return fmt.Errorf("list providers: %w", err)
+		}
+		pc.SortOrder = len(existing) + 100
+	}
+	now := time.Now().UTC()
+	pc.ID = uuid.New()
+	pc.CreatedAt = now
+	pc.UpdatedAt = now
+	if err := s.providerCfgRepo.Upsert(ctx, pc); err != nil {
+		return fmt.Errorf("create provider: %w", err)
+	}
+	rt := "provider_config"
+	_ = s.auditRepo.CreateLog(ctx, &domain.AuditLog{
+		ID:           uuid.New(),
+		Action:       "admin.provider_created",
+		ResourceType: &rt,
+		Details:      map[string]any{"provider": pc.Provider, "enabled": pc.IsEnabled},
+		CreatedAt:    now,
+	})
+	return nil
+}
+
 func (s *AdminService) UpdateProvider(ctx context.Context, pc *domain.ProviderConfig) error {
 	if !domain.IsValidProvider(pc.Provider) {
 		return fmt.Errorf("%w: unknown provider", ErrInvalidInput)
+	}
+	if domain.IsValidCustomProviderKey(pc.Provider) || domain.IsCustomOAuth2Provider(pc) {
+		if pc.ExtraConfig == nil {
+			pc.ExtraConfig = make(map[string]any)
+		}
+		pc.ExtraConfig["type"] = domain.ProviderTypeCustomOAuth2
+		if err := validateCustomOAuth2ProviderConfig(pc); err != nil {
+			return err
+		}
 	}
 	pc.UpdatedAt = time.Now().UTC()
 	if pc.ID == uuid.Nil {
@@ -283,6 +391,82 @@ func (s *AdminService) UpdateProvider(ctx context.Context, pc *domain.ProviderCo
 		Details:      map[string]any{"provider": pc.Provider, "enabled": pc.IsEnabled},
 		CreatedAt:    pc.UpdatedAt,
 	})
+	return nil
+}
+
+func (s *AdminService) DeleteProvider(ctx context.Context, provider string) error {
+	provider = strings.TrimSpace(provider)
+	if !domain.IsValidCustomProviderKey(provider) {
+		return fmt.Errorf("%w: only custom OAuth2 providers can be deleted", ErrInvalidInput)
+	}
+	if _, err := s.providerCfgRepo.Get(ctx, provider); err != nil {
+		if errors.Is(err, port.ErrNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("lookup provider: %w", err)
+	}
+	if err := s.providerCfgRepo.Delete(ctx, provider); err != nil {
+		return fmt.Errorf("delete provider: %w", err)
+	}
+	now := time.Now().UTC()
+	rt := "provider_config"
+	_ = s.auditRepo.CreateLog(ctx, &domain.AuditLog{
+		ID:           uuid.New(),
+		Action:       "admin.provider_deleted",
+		ResourceType: &rt,
+		Details:      map[string]any{"provider": provider},
+		CreatedAt:    now,
+	})
+	return nil
+}
+
+func validateCustomOAuth2ProviderConfig(pc *domain.ProviderConfig) error {
+	if pc == nil || !pc.IsEnabled {
+		return nil
+	}
+	if pc.ClientID == nil || strings.TrimSpace(*pc.ClientID) == "" {
+		return fmt.Errorf("%w: client_id is required when custom OAuth2 provider is enabled", ErrInvalidInput)
+	}
+	if pc.ClientSecret == nil || strings.TrimSpace(*pc.ClientSecret) == "" {
+		return fmt.Errorf("%w: client_secret is required when custom OAuth2 provider is enabled", ErrInvalidInput)
+	}
+	cfg := pc.CustomOAuth2Config()
+	if customOAuth2ExtraString(pc.ExtraConfig, "user_id_field", "user_id_path") == "" {
+		return fmt.Errorf("%w: user_id_field is required when custom OAuth2 provider is enabled", ErrInvalidInput)
+	}
+	for key, value := range map[string]string{
+		"authorization_endpoint": cfg.AuthURL,
+		"token_endpoint":         cfg.TokenURL,
+		"userinfo_endpoint":      cfg.UserURL,
+	} {
+		if err := validateHTTPURL(key, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func customOAuth2ExtraString(extra map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if v, _ := extra[key].(string); strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+func validateHTTPURL(key, value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Errorf("%w: %s is required when custom OAuth2 provider is enabled", ErrInvalidInput, key)
+	}
+	u, err := url.Parse(value)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return fmt.Errorf("%w: %s must be a valid URL", ErrInvalidInput, key)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("%w: %s must use http or https", ErrInvalidInput, key)
+	}
 	return nil
 }
 
@@ -306,6 +490,10 @@ func (s *AdminService) UpdateSetting(ctx context.Context, key, value, desc strin
 
 func (s *AdminService) ListSettings(ctx context.Context) ([]*domain.GlobalSetting, error) {
 	return s.settingsRepo.List(ctx)
+}
+
+func (s *AdminService) PasswordPolicy(ctx context.Context) PasswordPolicy {
+	return ResolvePasswordPolicy(ctx, s.settingsRepo, s.securityCfg)
 }
 
 func (s *AdminService) CreateAliasRestriction(ctx context.Context, pattern, restrictionType, reason string) (*domain.AliasRestriction, error) {
@@ -411,8 +599,8 @@ func (s *AdminService) ListAuditLogs(ctx context.Context, opts port.ListAuditOpt
 
 // ResetUserPassword allows an admin to force-reset a user's password.
 func (s *AdminService) ResetUserPassword(ctx context.Context, userID uuid.UUID, newPassword string) error {
-	if len(newPassword) < 6 {
-		return fmt.Errorf("%w: password must be at least 6 characters", ErrInvalidInput)
+	if err := ValidatePasswordByPolicy(newPassword, s.PasswordPolicy(ctx)); err != nil {
+		return err
 	}
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {

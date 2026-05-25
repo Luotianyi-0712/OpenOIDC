@@ -134,23 +134,20 @@ func (pc *ProviderConfig) CustomOAuth2Config() CustomOAuth2Config {
 	if pc == nil || pc.ExtraConfig == nil {
 		return cfg
 	}
-	cfg.AuthURL = extraString(pc.ExtraConfig, "auth_url")
-	cfg.TokenURL = extraString(pc.ExtraConfig, "token_url")
-	cfg.UserURL = extraString(pc.ExtraConfig, "userinfo_url")
-	if cfg.UserURL == "" {
-		cfg.UserURL = extraString(pc.ExtraConfig, "user_url")
-	}
+	cfg.AuthURL = firstExtraString(pc.ExtraConfig, "authorization_endpoint", "auth_url")
+	cfg.TokenURL = firstExtraString(pc.ExtraConfig, "token_endpoint", "token_url")
+	cfg.UserURL = firstExtraString(pc.ExtraConfig, "userinfo_endpoint", "userinfo_url", "user_url")
 	cfg.Scopes = extraStringSlice(pc.ExtraConfig, "scopes")
-	if v := extraString(pc.ExtraConfig, "user_id_path"); v != "" {
+	if v := firstExtraString(pc.ExtraConfig, "user_id_field", "user_id_path"); v != "" {
 		cfg.IDPath = v
 	}
-	if v := extraString(pc.ExtraConfig, "email_path"); v != "" {
+	if v := firstExtraString(pc.ExtraConfig, "email_field", "email_path"); v != "" {
 		cfg.EmailPath = v
 	}
-	if v := extraString(pc.ExtraConfig, "name_path"); v != "" {
+	if v := firstExtraString(pc.ExtraConfig, "name_field", "name_path"); v != "" {
 		cfg.NamePath = v
 	}
-	if v := extraString(pc.ExtraConfig, "avatar_path"); v != "" {
+	if v := firstExtraString(pc.ExtraConfig, "avatar_field", "avatar_path"); v != "" {
 		cfg.AvatarPath = v
 	}
 	return cfg
@@ -166,6 +163,15 @@ type GlobalSetting struct {
 func extraString(extra map[string]any, key string) string {
 	v, _ := extra[key].(string)
 	return strings.TrimSpace(v)
+}
+
+func firstExtraString(extra map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value := extraString(extra, key); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func extraStringSlice(extra map[string]any, key string) []string {

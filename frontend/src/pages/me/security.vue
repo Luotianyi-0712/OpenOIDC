@@ -2,8 +2,9 @@
 import { ref, onMounted, computed } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { Loader2, Shield, ShieldCheck, ShieldAlert, Check, X, ArrowUp, Link2 } from 'lucide-vue-next'
+import { Loader2, Shield, ShieldCheck, ShieldAlert, Check, X, ArrowUp, Link2, Fingerprint, Plus, Trash2, Pencil } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { usePasskey, type PasskeyCredential } from '@/composables/usePasskey'
 
 const { t } = useI18n()
 
@@ -95,6 +96,61 @@ function providerLabel(provider: string): string {
   const translated = t(key)
   return translated !== key ? translated : provider
 }
+
+// Passkey management
+const { loading: passkeyLoading, error: passkeyError, registerPasskey, listPasskeys, deletePasskey, renamePasskey } = usePasskey()
+const passkeys = ref<PasskeyCredential[]>([])
+const passkeyListLoading = ref(false)
+const showRenameModal = ref(false)
+const renameTarget = ref<{ id: string; name: string } | null>(null)
+const renameInput = ref('')
+const showDeleteModal = ref(false)
+const deleteTarget = ref<{ id: string; name: string } | null>(null)
+
+async function fetchPasskeys() {
+  passkeyListLoading.value = true
+  try {
+    passkeys.value = await listPasskeys()
+  } catch { /* ignore */ }
+  finally { passkeyListLoading.value = false }
+}
+
+async function handleRegisterPasskey() {
+  const ok = await registerPasskey()
+  if (ok) fetchPasskeys()
+}
+
+function confirmDeletePasskey(pk: PasskeyCredential) {
+  deleteTarget.value = { id: pk.id, name: pk.name || t('passkey.unnamed') }
+  showDeleteModal.value = true
+}
+
+async function doDeletePasskey() {
+  if (!deleteTarget.value) return
+  showDeleteModal.value = false
+  await deletePasskey(deleteTarget.value.id)
+  fetchPasskeys()
+}
+
+function openRename(pk: PasskeyCredential) {
+  renameTarget.value = { id: pk.id, name: pk.name }
+  renameInput.value = pk.name
+  showRenameModal.value = true
+}
+
+async function doRename() {
+  if (!renameTarget.value || !renameInput.value.trim()) return
+  showRenameModal.value = false
+  await renamePasskey(renameTarget.value.id, renameInput.value.trim())
+  fetchPasskeys()
+}
+
+function formatPasskeyDate(iso: string | null) {
+  if (!iso) return '-'
+  return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+onMounted(fetchPasskeys)
 </script>
 
 <template>
@@ -186,10 +242,58 @@ function providerLabel(provider: string): string {
         <p class="text-sm font-medium">{{ $t('security.maxReached') }}</p>
       </div>
 
+      <!-- Passkey Management -->
+      <div class="border border-border rounded-xl p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-medium flex items-center gap-2">
+            <Fingerprint class="w-4 h-4 text-muted-foreground" /> {{ $t('passkey.title') }}
+          </h3>
+          <button
+            @click="handleRegisterPasskey"
+            :disabled="passkeyLoading"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            <Loader2 v-if="passkeyLoading" class="w-3 h-3 animate-spin" />
+            <Plus v-else class="w-3 h-3" />
+            {{ $t('passkey.register') }}
+          </button>
+        </div>
+        <div v-if="passkeyError" class="text-xs text-destructive mb-3">{{ passkeyError }}</div>
+        <div v-if="passkeyListLoading" class="flex items-center gap-2 text-xs text-muted-foreground py-4 justify-center">
+          <Loader2 class="w-3 h-3 animate-spin" /> {{ $t('passkey.loading') }}
+        </div>
+        <div v-else-if="passkeys.length === 0" class="text-sm text-muted-foreground text-center py-4">
+          {{ $t('passkey.empty') }}
+        </div>
+        <div v-else class="space-y-2.5">
+          <div v-for="pk in passkeys" :key="pk.id" class="flex items-center justify-between px-4 py-3 rounded-lg bg-muted/30">
+            <div>
+              <div class="text-sm font-medium">{{ pk.name || $t('passkey.unnamed') }}</div>
+              <div class="text-xs text-muted-foreground mt-0.5">
+                {{ $t('passkey.created') }}: {{ formatPasskeyDate(pk.created_at) }}
+                <span v-if="pk.last_used_at" class="ml-2">{{ $t('passkey.lastUsed') }}: {{ formatPasskeyDate(pk.last_used_at) }}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button @click="openRename(pk)" class="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                <Pencil class="w-3.5 h-3.5" />
+              </button>
+              <button @click="confirmDeletePasskey(pk)" class="p-1.5 rounded hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive">
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Account Info -->
       <div class="border border-border rounded-xl p-6">
         <h3 class="text-sm font-medium mb-3">{{ $t('security.accountDetails') }}</h3>
         <div class="space-y-2.5 text-sm">
+          <div class="flex justify-between gap-4 py-2 border-b border-border">
+            <span class="text-muted-foreground">{{ $t('profile.uid') }}</span>
+            <span class="font-mono text-xs text-right break-all">{{ auth.user?.id || '-' }}</span>
+          </div>
           <div class="flex justify-between py-2 border-b border-border">
             <span class="text-muted-foreground">{{ $t('security.emailVerified') }}</span>
             <span :class="auth.user?.email_verified ? 'text-success' : 'text-muted-foreground'">
@@ -211,5 +315,35 @@ function providerLabel(provider: string): string {
         </div>
       </div>
     </template>
+
+    <!-- Passkey Rename Modal -->
+    <div v-if="showRenameModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showRenameModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold">{{ $t('passkey.rename') }}</h2>
+          <button @click="showRenameModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
+        </div>
+        <input v-model="renameInput" class="w-full border border-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-foreground/10 mb-4" :placeholder="$t('passkey.namePlaceholder')" @keyup.enter="doRename" />
+        <div class="flex justify-end gap-2">
+          <button @click="showRenameModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
+          <button @click="doRename" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors">{{ $t('confirm') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Passkey Delete Modal -->
+    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showDeleteModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold">{{ $t('passkey.delete') }}</h2>
+          <button @click="showDeleteModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
+        </div>
+        <p class="text-sm text-muted-foreground mb-5">{{ $t('passkey.deleteConfirm', { name: deleteTarget?.name }) }}</p>
+        <div class="flex justify-end gap-2">
+          <button @click="showDeleteModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
+          <button @click="doDeletePasskey" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors">{{ $t('confirm') }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

@@ -14,31 +14,70 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const { providers, settings, loaded } = usePublicConfig()
-const { token: turnstileToken, containerId: turnstileId, reset: resetTurnstile, renderWidget } = useTurnstile(() => settings.value.turnstile_site_key)
+const { token: turnstileToken, containerId: turnstileId, reset: resetTurnstile } = useTurnstile(() => settings.value.turnstile_site_key)
 const { policy, hasRequirements, validate } = usePasswordPolicy()
 
 const displayName = ref('')
 const email = ref('')
 const password = ref('')
+const code = ref('')
+const codeSent = ref(false)
 const error = ref('')
 const loading = ref(false)
+const sendingCode = ref(false)
 
-const passwordErrors = computed(() => password.value ? validate(password.value) : [])
-const passwordValid = computed(() => password.value.length > 0 && passwordErrors.value.length === 0)
+const passwordErrors = computed(() => validate(password.value))
+const passwordChecks = computed(() => {
+  const value = password.value
+  return {
+    minLength: value.length >= policy.value.min_length,
+    upper: /[A-Z]/.test(value),
+    lower: /[a-z]/.test(value),
+    digit: /[0-9]/.test(value),
+    symbol: /[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~'"']/.test(value),
+  }
+})
+const requiresRegisterCode = computed(() => settings.value.registration_email_verification_required)
+const showAccountFields = computed(() => !requiresRegisterCode.value || codeSent.value)
+const submitLabel = computed(() => {
+  if (requiresRegisterCode.value && !codeSent.value) {
+    return sendingCode.value ? t('register.sendingCode') : t('register.sendCode')
+  }
+  return loading.value ? t('register.submitting') : t('register.submit')
+})
 
 function socialLogin(provider: string) {
   window.location.href = `/api/v1/social/${provider}/begin?return_to=/`
 }
 
+async function sendCode() {
+  error.value = ''
+  sendingCode.value = true
+  try {
+    await auth.sendRegisterCode(email.value, turnstileToken.value || undefined)
+    codeSent.value = true
+    resetTurnstile()
+  } catch (e: any) {
+    error.value = e.message || t('register.sendCodeFailed')
+    resetTurnstile()
+  } finally {
+    sendingCode.value = false
+  }
+}
+
 async function onSubmit() {
   error.value = ''
+  if (requiresRegisterCode.value && !codeSent.value) {
+    await sendCode()
+    return
+  }
   if (passwordErrors.value.length > 0) {
     error.value = t('passwordPolicy.notMet')
     return
   }
   loading.value = true
   try {
-    await auth.register(email.value, password.value, displayName.value, turnstileToken.value || undefined)
+    await auth.register(email.value, password.value, displayName.value, code.value, turnstileToken.value || undefined)
     router.push('/login?registered=1')
   } catch (e: any) {
     error.value = e.message || 'Registration failed. Please try again.'
@@ -104,21 +143,6 @@ async function onSubmit() {
       <!-- Form -->
       <form v-if="settings.registration_enabled" @submit.prevent="onSubmit" class="flex flex-col gap-4">
         <div>
-          <label class="block text-sm font-medium mb-1.5" for="name">{{ $t('register.name') }}</label>
-          <div class="relative">
-            <User class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <input
-              id="name"
-              v-model="displayName"
-              type="text"
-              required
-              autocomplete="name"
-              :placeholder="t('register.namePlaceholder')"
-              class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
-            />
-          </div>
-        </div>
-        <div>
           <label class="block text-sm font-medium mb-1.5" for="email">{{ $t('register.email') }}</label>
           <div class="relative">
             <Mail class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
@@ -129,61 +153,112 @@ async function onSubmit() {
               required
               autocomplete="email"
               placeholder="name@example.com"
-              class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+              :readonly="requiresRegisterCode && codeSent"
+              class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all disabled:opacity-60 read-only:bg-muted/30"
             />
           </div>
+          <p v-if="requiresRegisterCode && codeSent" class="text-xs text-muted-foreground mt-1.5">
+            {{ $t('register.codeSent') }}
+          </p>
+          <p v-else-if="!requiresRegisterCode" class="text-xs text-muted-foreground mt-1.5">
+            {{ $t('register.emailVerificationDisabled') }}
+          </p>
         </div>
-        <div>
-          <label class="block text-sm font-medium mb-1.5" for="password">{{ $t('register.password') }}</label>
-          <div class="relative">
-            <Lock class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <input
-              id="password"
-              v-model="password"
-              type="password"
-              required
-              autocomplete="new-password"
-              :placeholder="t('register.passwordPlaceholder')"
-              class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
-            />
-          </div>
-          <!-- Password policy hints -->
-          <div v-if="hasRequirements && password" class="mt-2 space-y-1">
-            <div class="flex items-center gap-1.5 text-xs" :class="password.length >= policy.min_length ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="password.length >= policy.min_length" class="w-3 h-3" />
-              <X v-else class="w-3 h-3" />
-              {{ $t('passwordPolicy.minLength', { n: policy.min_length }) }}
-            </div>
-            <div v-if="policy.require_upper" class="flex items-center gap-1.5 text-xs" :class="/[A-Z]/.test(password) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[A-Z]/.test(password)" class="w-3 h-3" />
-              <X v-else class="w-3 h-3" />
-              {{ $t('passwordPolicy.requireUpper') }}
-            </div>
-            <div v-if="policy.require_lower" class="flex items-center gap-1.5 text-xs" :class="/[a-z]/.test(password) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[a-z]/.test(password)" class="w-3 h-3" />
-              <X v-else class="w-3 h-3" />
-              {{ $t('passwordPolicy.requireLower') }}
-            </div>
-            <div v-if="policy.require_digit" class="flex items-center gap-1.5 text-xs" :class="/[0-9]/.test(password) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[0-9]/.test(password)" class="w-3 h-3" />
-              <X v-else class="w-3 h-3" />
-              {{ $t('passwordPolicy.requireDigit') }}
-            </div>
-            <div v-if="policy.require_symbol" class="flex items-center gap-1.5 text-xs" :class="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(password) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(password)" class="w-3 h-3" />
-              <X v-else class="w-3 h-3" />
-              {{ $t('passwordPolicy.requireSymbol') }}
+
+        <template v-if="showAccountFields">
+          <div v-if="requiresRegisterCode">
+            <label class="block text-sm font-medium mb-1.5" for="code">{{ $t('register.code') }}</label>
+            <div class="relative">
+              <Mail class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <input
+                id="code"
+                v-model="code"
+                type="text"
+                inputmode="numeric"
+                required
+                autocomplete="one-time-code"
+                :placeholder="t('register.codePlaceholder')"
+                class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+              />
             </div>
           </div>
-        </div>
+          <div>
+            <label class="block text-sm font-medium mb-1.5" for="name">{{ $t('register.name') }}</label>
+            <div class="relative">
+              <User class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <input
+                id="name"
+                v-model="displayName"
+                type="text"
+                required
+                autocomplete="name"
+                :placeholder="t('register.namePlaceholder')"
+                class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1.5" for="password">{{ $t('register.password') }}</label>
+            <div class="relative">
+              <Lock class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <input
+                id="password"
+                v-model="password"
+                type="password"
+                required
+                autocomplete="new-password"
+                :placeholder="t('register.passwordPlaceholder')"
+                class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+              />
+            </div>
+            <!-- Password policy hints -->
+            <div v-if="hasRequirements" class="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2 space-y-1.5">
+              <p class="text-xs font-medium text-muted-foreground">{{ $t('passwordPolicy.title') }}</p>
+              <div class="flex items-center gap-1.5 text-xs" :class="passwordChecks.minLength ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="passwordChecks.minLength" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.minLength', { n: policy.min_length }) }}
+              </div>
+              <div v-if="policy.require_upper" class="flex items-center gap-1.5 text-xs" :class="passwordChecks.upper ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="passwordChecks.upper" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.requireUpper') }}
+              </div>
+              <div v-if="policy.require_lower" class="flex items-center gap-1.5 text-xs" :class="passwordChecks.lower ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="passwordChecks.lower" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.requireLower') }}
+              </div>
+              <div v-if="policy.require_digit" class="flex items-center gap-1.5 text-xs" :class="passwordChecks.digit ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="passwordChecks.digit" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.requireDigit') }}
+              </div>
+              <div v-if="policy.require_symbol" class="flex items-center gap-1.5 text-xs" :class="passwordChecks.symbol ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="passwordChecks.symbol" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.requireSymbol') }}
+              </div>
+            </div>
+          </div>
+        </template>
         <div v-if="settings.turnstile_site_key" :id="turnstileId" class="flex justify-center"></div>
         <button
           type="submit"
-          :disabled="loading"
+          :disabled="loading || sendingCode"
           class="w-full bg-foreground text-white rounded-full py-2.5 text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mt-1"
         >
-          <Loader2 v-if="loading" class="w-4 h-4 animate-spin" />
-          {{ loading ? $t('register.submitting') : $t('register.submit') }}
+          <Loader2 v-if="loading || sendingCode" class="w-4 h-4 animate-spin" />
+          {{ submitLabel }}
+        </button>
+        <button
+          v-if="requiresRegisterCode && codeSent"
+          type="button"
+          :disabled="sendingCode || loading"
+          class="text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
+          @click="sendCode"
+        >
+          {{ sendingCode ? $t('register.sendingCode') : $t('register.resendCode') }}
         </button>
       </form>
 

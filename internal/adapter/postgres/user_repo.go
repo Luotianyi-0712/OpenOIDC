@@ -174,7 +174,7 @@ func (r *UserRepo) List(ctx context.Context, opts port.ListUsersOptions) ([]*dom
 
 	if opts.Search != "" {
 		args = append(args, "%"+opts.Search+"%")
-		where = append(where, fmt.Sprintf("(email ILIKE $%d OR display_name ILIKE $%d)", len(args), len(args)))
+		where = append(where, fmt.Sprintf("(id::text ILIKE $%d OR email ILIKE $%d OR display_name ILIKE $%d)", len(args), len(args), len(args)))
 	}
 	if opts.Status != nil {
 		args = append(args, string(*opts.Status))

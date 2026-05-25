@@ -153,8 +153,8 @@ function categoryLabel(cat: string): string {
               </div>
               <p class="mt-2 text-sm">{{ report.reason }}</p>
               <div class="mt-2 flex gap-4 text-xs text-muted-foreground">
-                <span>{{ $t('adminRisk.target') }}: <code class="font-mono">{{ report.target_id.slice(0, 8) }}...</code></span>
-                <span>{{ $t('adminRisk.reporter') }}: <code class="font-mono">{{ report.reporter_id.slice(0, 8) }}...</code></span>
+                <span>{{ $t('adminRisk.target') }}: <code class="font-mono break-all">{{ report.target_id }}</code></span>
+                <span>{{ $t('adminRisk.reporter') }}: <code class="font-mono break-all">{{ report.reporter_id }}</code></span>
               </div>
             </div>
             <div class="flex gap-2 shrink-0">
@@ -187,6 +187,7 @@ function categoryLabel(cat: string): string {
             <tr class="border-b border-border text-left text-muted-foreground">
               <th class="py-2 pr-4 font-medium">{{ $t('adminRisk.provider') }}</th>
               <th class="py-2 pr-4 font-medium">{{ $t('adminRisk.providerUid') }}</th>
+              <th class="py-2 pr-4 font-medium">{{ $t('adminRisk.userUid') }}</th>
               <th class="py-2 pr-4 font-medium">{{ $t('adminRisk.reason') }}</th>
               <th class="py-2 pr-4 font-medium">{{ $t('adminRisk.time') }}</th>
               <th class="py-2 font-medium">{{ $t('actions') }}</th>
@@ -196,6 +197,7 @@ function categoryLabel(cat: string): string {
             <tr v-for="entry in blacklist" :key="entry.id" class="border-b border-border/50">
               <td class="py-2.5 pr-4 font-mono text-xs">{{ entry.provider }}</td>
               <td class="py-2.5 pr-4 font-mono text-xs truncate max-w-[200px]">{{ entry.provider_uid }}</td>
+              <td class="py-2.5 pr-4 font-mono text-xs truncate max-w-[200px]">{{ entry.user_id || '-' }}</td>
               <td class="py-2.5 pr-4 text-xs">{{ entry.reason }}</td>
               <td class="py-2.5 pr-4 text-xs text-muted-foreground">{{ new Date(entry.created_at).toLocaleString() }}</td>
               <td class="py-2.5">

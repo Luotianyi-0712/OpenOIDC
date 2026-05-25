@@ -8,11 +8,13 @@ export interface EnabledProvider {
 
 export interface PublicSettings {
   registration_enabled: boolean
+  registration_email_verification_required: boolean
   password_login_enabled: boolean
   social_login_enabled: boolean
   social_register_enabled: boolean
   turnstile_site_key: string
   developer_min_trust_level: number
+  passkey_enabled: boolean
 }
 
 const PROVIDER_ICONS: Record<string, { path: string; color: string }> = {
@@ -79,11 +81,13 @@ export function usePublicConfig() {
   const providers = ref<EnabledProvider[]>([])
   const settings = ref<PublicSettings>({
     registration_enabled: true,
+    registration_email_verification_required: true,
     password_login_enabled: true,
     social_login_enabled: true,
     social_register_enabled: true,
     turnstile_site_key: '',
     developer_min_trust_level: 1,
+    passkey_enabled: true,
   })
   const loaded = ref(false)
 
@@ -98,11 +102,13 @@ export function usePublicConfig() {
         const d = setRes.data
         settings.value = {
           registration_enabled: d.registration_enabled !== 'false',
+          registration_email_verification_required: d.registration_email_verification_required !== 'false',
           password_login_enabled: d.password_login_enabled !== 'false',
           social_login_enabled: d.social_login_enabled !== 'false',
           social_register_enabled: d.social_register_enabled !== 'false',
           turnstile_site_key: d.turnstile_site_key || '',
           developer_min_trust_level: parseInt(d.developer_min_trust_level) || 1,
+          passkey_enabled: d.passkey_enabled !== 'false',
         }
       }
     } catch {

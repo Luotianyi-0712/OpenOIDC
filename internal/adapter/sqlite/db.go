@@ -245,6 +245,20 @@ func RunMigrations(db *sql.DB) error {
 		created_at DATETIME NOT NULL,
 		UNIQUE(provider, provider_uid)
 	);
+
+	CREATE TABLE IF NOT EXISTS passkey_credentials (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL REFERENCES users(id),
+		credential_id BLOB NOT NULL UNIQUE,
+		public_key BLOB NOT NULL,
+		attestation_type TEXT NOT NULL DEFAULT 'none',
+		transport TEXT NOT NULL DEFAULT '[]',
+		sign_count INTEGER NOT NULL DEFAULT 0,
+		aaguid BLOB,
+		name TEXT NOT NULL DEFAULT '',
+		last_used_at DATETIME,
+		created_at DATETIME NOT NULL
+	);
 	`
 
 	_, err := db.Exec(schema)
@@ -288,6 +302,7 @@ func RunMigrations(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_social_bindings_auth_due ON social_bindings(last_auth_check_at) WHERE status = 'active'`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_social_bindings_active_provider_uid ON social_bindings(provider, provider_uid) WHERE status = 'active'`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_social_bindings_active_user_provider ON social_bindings(user_id, provider) WHERE status = 'active'`,
+		`CREATE INDEX IF NOT EXISTS idx_passkey_credentials_user_id ON passkey_credentials(user_id)`,
 	}
 	for _, stmt := range indexStmts {
 		db.Exec(stmt)

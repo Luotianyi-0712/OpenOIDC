@@ -53,6 +53,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 		riskReportRepo  port.RiskReportRepository
 		riskListRepo    port.RiskListRepository
 		consentRepo     port.ConsentRepository
+		passkeyRepo     port.PasskeyRepository
 		cache           port.Cache
 		fositeStore     fosite.Storage
 	)
@@ -93,6 +94,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 		riskListRepo = sqliteAdapter.NewRiskListRepo(sqliteDB)
 		consentRepo = sqliteAdapter.NewConsentRepo(sqliteDB)
 		fositeStore = sqliteAdapter.NewFositeStore(sqliteDB, secretCipher)
+		passkeyRepo = sqliteAdapter.NewPasskeyRepo(sqliteDB)
 
 		mc := memcache.NewMemCache()
 		cleanup = chainCleanup(cleanup, func() { _ = mc.Close() })
@@ -137,6 +139,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 		riskListRepo = postgres.NewRiskListRepo(db)
 		consentRepo = postgres.NewConsentRepo(db)
 		fositeStore = postgres.NewFositeStore(db, secretCipher)
+		passkeyRepo = postgres.NewPasskeyRepo(db)
 	}
 	// settingsRepo is used by devHandler above.
 
@@ -156,9 +159,15 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	sessionSvc := service.NewSessionService(sessionRepo, cfg)
 	socialSvc := service.NewSocialService(bindingRepo, userRepo, socialRegistry, cache, securitySvc, sessionRepo, auditRepo, settingsRepo, riskListRepo, cfg)
 	clientSvc := service.NewClientService(clientRepo, accessRuleRepo, auditRepo, secretCipher)
-	adminSvc := service.NewAdminService(userRepo, providerCfgRepo, settingsRepo, aliasRepo, signingKeyRepo, auditRepo)
+	adminSvc := service.NewAdminService(userRepo, providerCfgRepo, settingsRepo, aliasRepo, signingKeyRepo, auditRepo, passkeyRepo, cfg.Security)
 	accessCtrl := service.NewAccessControlService(accessRuleRepo, aliasRepo)
 	riskSvc := service.NewRiskService(riskReportRepo, riskListRepo, bindingRepo, userRepo, auditRepo, securitySvc)
+
+	// Passkey service.
+	passkeySvc, err := service.NewPasskeyService(passkeyRepo, userRepo, sessionRepo, cache, settingsRepo, cfg)
+	if err != nil {
+		return router.Deps{}, cleanup, fmt.Errorf("passkey service: %w", err)
+	}
 
 	// OIDC provider.
 	privKey, err := loadOrCreateSigningKey(ctx, signingKeyRepo, adminSvc)
@@ -187,6 +196,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	wellKnownHandler := handler.NewWellKnownHandler(cfg.Server.BaseURL, signingKeyRepo)
 	devHandler := handler.NewDeveloperHandler(clientSvc, riskSvc, userRepo, settingsRepo, consentRepo)
 	healthHandler := handler.NewHealthHandler(pgPool, redisClient)
+	passkeyHandler := handler.NewPasskeyHandler(passkeySvc, cfg.Session)
 
 	allowedOrigins := []string{"*"}
 	if v := os.Getenv("OIDC_ALLOWED_ORIGINS"); v != "" {
@@ -213,6 +223,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 		DeveloperHandler: devHandler,
 		WellKnownHandler: wellKnownHandler,
 		HealthHandler:    healthHandler,
+		PasskeyHandler:   passkeyHandler,
 		SessionService:   sessionSvc,
 		UserRepo:         userRepo,
 		SettingsRepo:     settingsRepo,
@@ -396,11 +407,13 @@ func seedProviders(ctx context.Context, repo port.ProviderConfigRepository) {
 
 func seedSettings(ctx context.Context, repo port.SettingsRepository) {
 	defaults := map[string]string{
-		"registration_enabled":    "true",
-		"password_login_enabled":  "true",
-		"social_login_enabled":    "true",
-		"social_register_enabled": "true",
-		"social_binding_enabled":  "true",
+		"registration_enabled":                     "true",
+		"registration_email_verification_required": "true",
+		"password_login_enabled":                   "true",
+		"social_login_enabled":                     "true",
+		"social_register_enabled":                  "true",
+		"social_binding_enabled":                   "true",
+		"passkey_enabled":                          "true",
 	}
 	for key, value := range defaults {
 		if _, err := repo.Get(ctx, key); err != nil {

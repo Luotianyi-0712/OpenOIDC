@@ -106,7 +106,11 @@ onMounted(fetchStats)
                 <td class="px-4 py-3 text-muted-foreground whitespace-nowrap text-xs">{{ formatTime(event.created_at) }}</td>
                 <td class="px-4 py-3 text-xs">
                   <span v-if="event.user_email" class="font-medium">{{ event.user_email }}</span>
+                  <span v-else-if="event.user_id" class="text-muted-foreground font-mono">{{ event.user_id }}</span>
                   <span v-else class="text-muted-foreground">-</span>
+                  <div v-if="event.user_email && event.user_id" class="text-muted-foreground font-mono mt-0.5">
+                    {{ event.user_id }}
+                  </div>
                 </td>
                 <td class="px-4 py-3">
                   <span class="inline-block px-2 py-0.5 rounded-md bg-muted text-xs font-medium">{{ actionLabel(event.action) }}</span>

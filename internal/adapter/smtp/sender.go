@@ -68,6 +68,25 @@ func (s *Sender) getConfig(ctx context.Context) (host string, port int, username
 	return
 }
 
+func (s *Sender) SendRegistrationCode(ctx context.Context, to, code string) error {
+	subject := "注册验证码 / Registration code"
+	body := fmt.Sprintf(`您好，
+
+您的注册验证码是：%s
+
+验证码 10 分钟内有效。验证通过后才会创建账户。如果您没有注册账户，请忽略此邮件。
+
+---
+Hello,
+
+Your registration code is: %s
+
+This code expires in 10 minutes. Your account will be created only after verification. If you didn't request this, please ignore this email.
+`, code, code)
+
+	return s.send(ctx, to, subject, body)
+}
+
 func (s *Sender) SendVerificationEmail(ctx context.Context, to, token string) error {
 	link := fmt.Sprintf("%s/verify-email?token=%s", s.baseURL, token)
 	subject := "验证您的邮箱 / Verify your email"

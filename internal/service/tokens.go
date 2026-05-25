@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 )
 
 func generateSessionToken() (string, error) {
@@ -20,6 +21,21 @@ func generateRandomToken(n int) (string, error) {
 		return "", fmt.Errorf("generate random token: %w", err)
 	}
 	return hex.EncodeToString(b), nil
+}
+
+func generateNumericCode(length int) (string, error) {
+	if length <= 0 {
+		return "", nil
+	}
+	code := make([]byte, length)
+	for i := range code {
+		n, err := rand.Int(rand.Reader, big.NewInt(10))
+		if err != nil {
+			return "", fmt.Errorf("generate numeric code: %w", err)
+		}
+		code[i] = byte('0' + n.Int64())
+	}
+	return string(code), nil
 }
 
 // GenerateRandomTokenExported is an exported wrapper around generateRandomToken.

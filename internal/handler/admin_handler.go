@@ -304,6 +304,42 @@ func (h *AdminHandler) UnbindUserSocial(w http.ResponseWriter, r *http.Request) 
 	JSON(w, http.StatusOK, map[string]any{"unbound": true})
 }
 
+func (h *AdminHandler) ListUserPasskeys(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_id", err.Error())
+		return
+	}
+	passkeys, err := h.adminSvc.ListUserPasskeys(r.Context(), id)
+	if err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(passkeys))
+	for _, passkey := range passkeys {
+		out = append(out, adminPasskeyPayload(passkey))
+	}
+	JSON(w, http.StatusOK, out)
+}
+
+func (h *AdminHandler) DeleteUserPasskey(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_id", err.Error())
+		return
+	}
+	passkeyID, err := uuid.Parse(chi.URLParam(r, "passkey_id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_passkey_id", err.Error())
+		return
+	}
+	if err := h.adminSvc.DeleteUserPasskey(r.Context(), id, passkeyID); err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
 // ---------------- Clients ----------------
 
 type createClientRequest struct {
@@ -671,22 +707,78 @@ func (h *AdminHandler) ListProviders(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, out)
 }
 
+func (h *AdminHandler) GetProvider(w http.ResponseWriter, r *http.Request) {
+	providerName := strings.ToLower(strings.TrimSpace(chi.URLParam(r, "provider")))
+	pc, err := h.adminSvc.GetProvider(r.Context(), providerName)
+	if err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, providerPayload(pc))
+}
+
 type updateProviderRequest struct {
-	Enabled      *bool   `json:"enabled"`
-	ClientID     *string `json:"client_id"`
-	ClientSecret *string `json:"client_secret"`
-	AppID        *string `json:"app_id"`
-	AppSecret    *string `json:"app_secret"`
-	DisplayName  *string `json:"display_name"`
-	TeamID       *string `json:"team_id"`
-	KeyID        *string `json:"key_id"`
-	PrivateKey   *string `json:"private_key"`
-	BaseURL      *string `json:"base_url"`
-	TenantID     *string `json:"tenant_id"`
+	Enabled               *bool    `json:"enabled"`
+	ClientID              *string  `json:"client_id"`
+	ClientSecret          *string  `json:"client_secret"`
+	AppID                 *string  `json:"app_id"`
+	AppSecret             *string  `json:"app_secret"`
+	DisplayName           *string  `json:"display_name"`
+	Type                  *string  `json:"type"`
+	TeamID                *string  `json:"team_id"`
+	KeyID                 *string  `json:"key_id"`
+	PrivateKey            *string  `json:"private_key"`
+	BaseURL               *string  `json:"base_url"`
+	TenantID              *string  `json:"tenant_id"`
+	AuthURL               *string  `json:"auth_url"`
+	AuthorizationEndpoint *string  `json:"authorization_endpoint"`
+	TokenURL              *string  `json:"token_url"`
+	TokenEndpoint         *string  `json:"token_endpoint"`
+	UserInfoURL           *string  `json:"userinfo_url"`
+	UserInfoEndpoint      *string  `json:"userinfo_endpoint"`
+	Scopes                []string `json:"scopes"`
+	UserIDPath            *string  `json:"user_id_path"`
+	UserIDField           *string  `json:"user_id_field"`
+	EmailPath             *string  `json:"email_path"`
+	EmailField            *string  `json:"email_field"`
+	NamePath              *string  `json:"name_path"`
+	NameField             *string  `json:"name_field"`
+	AvatarPath            *string  `json:"avatar_path"`
+	AvatarField           *string  `json:"avatar_field"`
+	IconURL               *string  `json:"icon_url"`
+	SortOrder             *int     `json:"sort_order"`
+}
+
+type createProviderRequest struct {
+	Provider string `json:"provider"`
+	updateProviderRequest
+}
+
+func (h *AdminHandler) CreateProvider(w http.ResponseWriter, r *http.Request) {
+	var req createProviderRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	pc := &domain.ProviderConfig{
+		Provider:    strings.ToLower(strings.TrimSpace(req.Provider)),
+		IsEnabled:   false,
+		ExtraConfig: map[string]any{"type": domain.ProviderTypeCustomOAuth2},
+	}
+	applyProviderRequest(pc, req.updateProviderRequest)
+
+	if err := h.adminSvc.CreateProvider(r.Context(), pc); err != nil {
+		mapAdminError(w, err)
+		return
+	}
+
+	h.reloadSocialRegistry(r.Context())
+	JSON(w, http.StatusCreated, providerPayload(pc))
 }
 
 func (h *AdminHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
-	providerName := chi.URLParam(r, "provider")
+	providerName := strings.ToLower(strings.TrimSpace(chi.URLParam(r, "provider")))
 	var req updateProviderRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -695,78 +787,175 @@ func (h *AdminHandler) UpdateProvider(w http.ResponseWriter, r *http.Request) {
 
 	existing, err := h.adminSvc.GetProvider(r.Context(), providerName)
 	if err != nil {
+		if domain.IsValidCustomProviderKey(providerName) {
+			mapAdminError(w, err)
+			return
+		}
 		existing = &domain.ProviderConfig{Provider: providerName}
 	}
-
-	if req.Enabled != nil {
-		existing.IsEnabled = *req.Enabled
-	}
-	if req.DisplayName != nil {
-		existing.DisplayName = *req.DisplayName
-	}
-	if req.ClientID != nil {
-		existing.ClientID = req.ClientID
-	}
-	if req.ClientSecret != nil {
-		existing.ClientSecret = req.ClientSecret
-	}
-	if req.AppID != nil {
-		if existing.ExtraConfig == nil {
-			existing.ExtraConfig = make(map[string]any)
-		}
-		existing.ExtraConfig["app_id"] = *req.AppID
-		existing.ClientID = req.AppID
-	}
-	if req.AppSecret != nil {
-		if existing.ExtraConfig == nil {
-			existing.ExtraConfig = make(map[string]any)
-		}
-		existing.ExtraConfig["app_secret"] = *req.AppSecret
-		existing.ClientSecret = req.AppSecret
-	}
-	if req.TeamID != nil {
-		if existing.ExtraConfig == nil {
-			existing.ExtraConfig = make(map[string]any)
-		}
-		existing.ExtraConfig["team_id"] = *req.TeamID
-	}
-	if req.KeyID != nil {
-		if existing.ExtraConfig == nil {
-			existing.ExtraConfig = make(map[string]any)
-		}
-		existing.ExtraConfig["key_id"] = *req.KeyID
-	}
-	if req.PrivateKey != nil {
-		if existing.ExtraConfig == nil {
-			existing.ExtraConfig = make(map[string]any)
-		}
-		existing.ExtraConfig["private_key"] = *req.PrivateKey
-	}
-	if req.BaseURL != nil {
-		if existing.ExtraConfig == nil {
-			existing.ExtraConfig = make(map[string]any)
-		}
-		existing.ExtraConfig["base_url"] = *req.BaseURL
-	}
-	if req.TenantID != nil {
-		if existing.ExtraConfig == nil {
-			existing.ExtraConfig = make(map[string]any)
-		}
-		existing.ExtraConfig["tenant_id"] = *req.TenantID
-	}
+	applyProviderRequest(existing, req)
 
 	if err := h.adminSvc.UpdateProvider(r.Context(), existing); err != nil {
 		mapAdminError(w, err)
 		return
 	}
 
-	if h.socialRegistry != nil {
-		if err := h.socialRegistry.Reload(r.Context()); err != nil {
-			slog.Warn("reload social registry after provider update", "error", err)
-		}
-	}
-
+	h.reloadSocialRegistry(r.Context())
 	JSON(w, http.StatusOK, providerPayload(existing))
+}
+
+func (h *AdminHandler) DeleteProvider(w http.ResponseWriter, r *http.Request) {
+	providerName := strings.ToLower(strings.TrimSpace(chi.URLParam(r, "provider")))
+	if err := h.adminSvc.DeleteProvider(r.Context(), providerName); err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	h.reloadSocialRegistry(r.Context())
+	JSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
+func (h *AdminHandler) reloadSocialRegistry(ctx context.Context) {
+	if h.socialRegistry == nil {
+		return
+	}
+	if err := h.socialRegistry.Reload(ctx); err != nil {
+		slog.Warn("reload social registry after provider change", "error", err)
+	}
+}
+
+func applyProviderRequest(pc *domain.ProviderConfig, req updateProviderRequest) {
+	if req.Enabled != nil {
+		pc.IsEnabled = *req.Enabled
+	}
+	if req.DisplayName != nil {
+		pc.DisplayName = strings.TrimSpace(*req.DisplayName)
+	}
+	if req.ClientID != nil {
+		v := strings.TrimSpace(*req.ClientID)
+		pc.ClientID = &v
+	}
+	if req.ClientSecret != nil {
+		v := strings.TrimSpace(*req.ClientSecret)
+		pc.ClientSecret = &v
+	}
+	if req.SortOrder != nil {
+		pc.SortOrder = *req.SortOrder
+	}
+	if req.AppID != nil {
+		setProviderExtra(pc, "app_id", *req.AppID)
+		v := strings.TrimSpace(*req.AppID)
+		pc.ClientID = &v
+	}
+	if req.AppSecret != nil {
+		setProviderExtra(pc, "app_secret", *req.AppSecret)
+		v := strings.TrimSpace(*req.AppSecret)
+		pc.ClientSecret = &v
+	}
+	if req.TeamID != nil {
+		setProviderExtra(pc, "team_id", *req.TeamID)
+	}
+	if req.KeyID != nil {
+		setProviderExtra(pc, "key_id", *req.KeyID)
+	}
+	if req.PrivateKey != nil {
+		setProviderExtra(pc, "private_key", *req.PrivateKey)
+	}
+	if req.BaseURL != nil {
+		setProviderExtra(pc, "base_url", *req.BaseURL)
+	}
+	if req.TenantID != nil {
+		setProviderExtra(pc, "tenant_id", *req.TenantID)
+	}
+	if req.AuthURL != nil {
+		setProviderExtra(pc, "auth_url", *req.AuthURL)
+		setProviderExtra(pc, "authorization_endpoint", *req.AuthURL)
+	}
+	if req.AuthorizationEndpoint != nil {
+		setProviderExtra(pc, "authorization_endpoint", *req.AuthorizationEndpoint)
+		setProviderExtra(pc, "auth_url", *req.AuthorizationEndpoint)
+	}
+	if req.TokenURL != nil {
+		setProviderExtra(pc, "token_url", *req.TokenURL)
+		setProviderExtra(pc, "token_endpoint", *req.TokenURL)
+	}
+	if req.TokenEndpoint != nil {
+		setProviderExtra(pc, "token_endpoint", *req.TokenEndpoint)
+		setProviderExtra(pc, "token_url", *req.TokenEndpoint)
+	}
+	if req.UserInfoURL != nil {
+		setProviderExtra(pc, "userinfo_url", *req.UserInfoURL)
+		setProviderExtra(pc, "userinfo_endpoint", *req.UserInfoURL)
+	}
+	if req.UserInfoEndpoint != nil {
+		setProviderExtra(pc, "userinfo_endpoint", *req.UserInfoEndpoint)
+		setProviderExtra(pc, "userinfo_url", *req.UserInfoEndpoint)
+	}
+	if req.UserIDPath != nil {
+		setProviderExtra(pc, "user_id_path", *req.UserIDPath)
+		setProviderExtra(pc, "user_id_field", *req.UserIDPath)
+	}
+	if req.UserIDField != nil {
+		setProviderExtra(pc, "user_id_field", *req.UserIDField)
+		setProviderExtra(pc, "user_id_path", *req.UserIDField)
+	}
+	if req.EmailPath != nil {
+		setProviderExtra(pc, "email_path", *req.EmailPath)
+		setProviderExtra(pc, "email_field", *req.EmailPath)
+	}
+	if req.EmailField != nil {
+		setProviderExtra(pc, "email_field", *req.EmailField)
+		setProviderExtra(pc, "email_path", *req.EmailField)
+	}
+	if req.NamePath != nil {
+		setProviderExtra(pc, "name_path", *req.NamePath)
+		setProviderExtra(pc, "name_field", *req.NamePath)
+	}
+	if req.NameField != nil {
+		setProviderExtra(pc, "name_field", *req.NameField)
+		setProviderExtra(pc, "name_path", *req.NameField)
+	}
+	if req.AvatarPath != nil {
+		setProviderExtra(pc, "avatar_path", *req.AvatarPath)
+		setProviderExtra(pc, "avatar_field", *req.AvatarPath)
+	}
+	if req.AvatarField != nil {
+		setProviderExtra(pc, "avatar_field", *req.AvatarField)
+		setProviderExtra(pc, "avatar_path", *req.AvatarField)
+	}
+	if req.IconURL != nil {
+		setProviderExtra(pc, "icon_url", *req.IconURL)
+	}
+	if req.Scopes != nil {
+		setProviderExtra(pc, "scopes", cleanProviderStringSlice(req.Scopes))
+	}
+}
+
+func setProviderExtra(pc *domain.ProviderConfig, key string, value any) {
+	if pc.ExtraConfig == nil {
+		pc.ExtraConfig = make(map[string]any)
+	}
+	if s, ok := value.(string); ok {
+		pc.ExtraConfig[key] = strings.TrimSpace(s)
+		return
+	}
+	pc.ExtraConfig[key] = value
+}
+
+func cleanProviderStringSlice(items []string) []string {
+	out := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out
 }
 
 func providerPayload(pc *domain.ProviderConfig) map[string]any {
@@ -774,6 +963,7 @@ func providerPayload(pc *domain.ProviderConfig) map[string]any {
 		"provider":     pc.Provider,
 		"display_name": pc.DisplayName,
 		"enabled":      pc.IsEnabled,
+		"type":         domain.ProviderType(pc),
 		"sort_order":   pc.SortOrder,
 		"created_at":   pc.CreatedAt,
 		"updated_at":   pc.UpdatedAt,
@@ -784,31 +974,97 @@ func providerPayload(pc *domain.ProviderConfig) map[string]any {
 	m["has_secret"] = pc.ClientSecret != nil && *pc.ClientSecret != ""
 
 	if pc.ExtraConfig != nil {
-		if appID, ok := pc.ExtraConfig["app_id"].(string); ok && appID != "" {
+		if appID := providerExtraString(pc.ExtraConfig, "app_id"); appID != "" {
 			m["app_id"] = appID
 		}
-		if teamID, ok := pc.ExtraConfig["team_id"].(string); ok && teamID != "" {
+		if teamID := providerExtraString(pc.ExtraConfig, "team_id"); teamID != "" {
 			m["team_id"] = teamID
 		}
-		if keyID, ok := pc.ExtraConfig["key_id"].(string); ok && keyID != "" {
+		if keyID := providerExtraString(pc.ExtraConfig, "key_id"); keyID != "" {
 			m["key_id"] = keyID
 		}
-		if baseURL, ok := pc.ExtraConfig["base_url"].(string); ok && baseURL != "" {
+		if baseURL := providerExtraString(pc.ExtraConfig, "base_url"); baseURL != "" {
 			m["base_url"] = baseURL
 		}
-		if tenantID, ok := pc.ExtraConfig["tenant_id"].(string); ok && tenantID != "" {
+		if tenantID := providerExtraString(pc.ExtraConfig, "tenant_id"); tenantID != "" {
 			m["tenant_id"] = tenantID
 		}
-		m["has_app_secret"] = false
-		if as, ok := pc.ExtraConfig["app_secret"].(string); ok && as != "" {
-			m["has_app_secret"] = true
+		if iconURL := providerExtraString(pc.ExtraConfig, "icon_url"); iconURL != "" {
+			m["icon_url"] = iconURL
 		}
-		m["has_private_key"] = false
-		if pk, ok := pc.ExtraConfig["private_key"].(string); ok && pk != "" {
-			m["has_private_key"] = true
+		if authEndpoint := firstProviderExtraString(pc.ExtraConfig, "authorization_endpoint", "auth_url"); authEndpoint != "" {
+			m["authorization_endpoint"] = authEndpoint
+			m["auth_url"] = authEndpoint
 		}
+		if tokenEndpoint := firstProviderExtraString(pc.ExtraConfig, "token_endpoint", "token_url"); tokenEndpoint != "" {
+			m["token_endpoint"] = tokenEndpoint
+			m["token_url"] = tokenEndpoint
+		}
+		if userinfoEndpoint := firstProviderExtraString(pc.ExtraConfig, "userinfo_endpoint", "userinfo_url", "user_url"); userinfoEndpoint != "" {
+			m["userinfo_endpoint"] = userinfoEndpoint
+			m["userinfo_url"] = userinfoEndpoint
+		}
+		if userIDField := firstProviderExtraString(pc.ExtraConfig, "user_id_field", "user_id_path"); userIDField != "" {
+			m["user_id_field"] = userIDField
+			m["user_id_path"] = userIDField
+		}
+		if emailField := firstProviderExtraString(pc.ExtraConfig, "email_field", "email_path"); emailField != "" {
+			m["email_field"] = emailField
+			m["email_path"] = emailField
+		}
+		if nameField := firstProviderExtraString(pc.ExtraConfig, "name_field", "name_path"); nameField != "" {
+			m["name_field"] = nameField
+			m["name_path"] = nameField
+		}
+		if avatarField := firstProviderExtraString(pc.ExtraConfig, "avatar_field", "avatar_path"); avatarField != "" {
+			m["avatar_field"] = avatarField
+			m["avatar_path"] = avatarField
+		}
+		if scopes := providerExtraStringSlice(pc.ExtraConfig, "scopes"); len(scopes) > 0 {
+			m["scopes"] = scopes
+		}
+		m["has_app_secret"] = providerExtraString(pc.ExtraConfig, "app_secret") != ""
+		m["has_private_key"] = providerExtraString(pc.ExtraConfig, "private_key") != ""
 	}
 	return m
+}
+
+func providerExtraString(extra map[string]any, key string) string {
+	v, _ := extra[key].(string)
+	return strings.TrimSpace(v)
+}
+
+func firstProviderExtraString(extra map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value := providerExtraString(extra, key); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func providerExtraStringSlice(extra map[string]any, key string) []string {
+	v, ok := extra[key]
+	if !ok || v == nil {
+		return nil
+	}
+	switch t := v.(type) {
+	case []string:
+		return cleanProviderStringSlice(t)
+	case []any:
+		out := make([]string, 0, len(t))
+		for _, item := range t {
+			if s, ok := item.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return cleanProviderStringSlice(out)
+	case string:
+		parts := strings.FieldsFunc(t, func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\t' })
+		return cleanProviderStringSlice(parts)
+	default:
+		return nil
+	}
 }
 
 func maskSecret(s string, showLast int) string {
@@ -868,6 +1124,7 @@ func (h *AdminHandler) DeleteAliasRestriction(w http.ResponseWriter, r *http.Req
 func (h *AdminHandler) PublicSettings(w http.ResponseWriter, r *http.Request) {
 	keys := []string{
 		"registration_enabled",
+		"registration_email_verification_required",
 		"password_login_enabled",
 		"social_login_enabled",
 		"social_register_enabled",
@@ -892,39 +1149,7 @@ func (h *AdminHandler) PublicSettings(w http.ResponseWriter, r *http.Request) {
 
 // PasswordPolicy returns the password requirements for display on registration/change forms.
 func (h *AdminHandler) PasswordPolicy(w http.ResponseWriter, r *http.Request) {
-	// Retrieve password policy settings (with defaults from security config key pattern).
-	minLength := 8
-	requireUpper := false
-	requireLower := false
-	requireDigit := false
-	requireSymbol := false
-
-	// Try reading from settings repo (dynamically configured).
-	if s, err := h.adminSvc.GetSetting(r.Context(), "password_min_length"); err == nil && s.Value != "" {
-		if v, e := strconv.Atoi(s.Value); e == nil && v > 0 {
-			minLength = v
-		}
-	}
-	if s, err := h.adminSvc.GetSetting(r.Context(), "password_require_upper"); err == nil {
-		requireUpper = s.Value == "true"
-	}
-	if s, err := h.adminSvc.GetSetting(r.Context(), "password_require_lower"); err == nil {
-		requireLower = s.Value == "true"
-	}
-	if s, err := h.adminSvc.GetSetting(r.Context(), "password_require_digit"); err == nil {
-		requireDigit = s.Value == "true"
-	}
-	if s, err := h.adminSvc.GetSetting(r.Context(), "password_require_symbol"); err == nil {
-		requireSymbol = s.Value == "true"
-	}
-
-	JSON(w, http.StatusOK, map[string]any{
-		"min_length":     minLength,
-		"require_upper":  requireUpper,
-		"require_lower":  requireLower,
-		"require_digit":  requireDigit,
-		"require_symbol": requireSymbol,
-	})
+	JSON(w, http.StatusOK, h.adminSvc.PasswordPolicy(r.Context()))
 }
 
 type updateSettingRequest struct {
@@ -1294,6 +1519,16 @@ func (h *AdminHandler) clientPayload(ctx context.Context, c *domain.OIDCClient) 
 	return payload
 }
 
+func adminPasskeyPayload(c *domain.PasskeyCredential) map[string]any {
+	return map[string]any{
+		"id":           c.ID,
+		"name":         c.Name,
+		"created_at":   c.CreatedAt,
+		"last_used_at": c.LastUsedAt,
+		"transports":   c.Transport,
+	}
+}
+
 func formatAuditDetails(details map[string]any) string {
 	if len(details) == 0 {
 		return ""
@@ -1324,6 +1559,8 @@ func mapAdminError(w http.ResponseWriter, err error) {
 		Error(w, http.StatusConflict, "already_exists", err.Error())
 	case errors.Is(err, service.ErrInvalidInput):
 		Error(w, http.StatusBadRequest, "invalid_input", err.Error())
+	case errors.Is(err, service.ErrPasswordTooWeak):
+		Error(w, http.StatusBadRequest, "password_too_weak", err.Error())
 	case errors.Is(err, service.ErrInvalidAlias):
 		Error(w, http.StatusBadRequest, "invalid_alias", err.Error())
 	case errors.Is(err, service.ErrPermissionDenied):

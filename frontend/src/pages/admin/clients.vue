@@ -365,7 +365,7 @@ function formatDateTime(value: string) {
             <td class="px-4 py-3 font-mono text-xs text-muted-foreground max-w-56 truncate">{{ client.client_id }}</td>
             <td class="px-4 py-3 text-muted-foreground text-xs">
               <div class="truncate max-w-56">{{ ownerLabel(client) }}</div>
-              <div v-if="client.owner_user_id" class="font-mono truncate max-w-56">{{ client.owner_user_id }}</div>
+              <div v-if="client.owner_user_id" class="font-mono truncate max-w-56">{{ $t('adminUsers.uid') }} {{ client.owner_user_id }}</div>
             </td>
             <td class="px-4 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="client.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'">
@@ -420,7 +420,7 @@ function formatDateTime(value: string) {
               <div>
                 <div class="text-xs text-muted-foreground mb-1">{{ $t('adminClients.owner') }}</div>
                 <div>{{ ownerLabel(editingClient) }}</div>
-                <div v-if="editingClient.owner_user_id" class="font-mono text-xs text-muted-foreground break-all">{{ editingClient.owner_user_id }}</div>
+                <div v-if="editingClient.owner_user_id" class="font-mono text-xs text-muted-foreground break-all">{{ $t('adminUsers.uid') }} {{ editingClient.owner_user_id }}</div>
               </div>
               <div v-if="editingClient.client_secret" class="md:col-span-2">
                 <div class="text-xs text-muted-foreground mb-1">{{ $t('adminClients.clientSecret') }}</div>

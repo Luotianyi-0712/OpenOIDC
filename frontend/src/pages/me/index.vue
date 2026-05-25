@@ -159,6 +159,9 @@ async function changePassword() {
           </template>
         </div>
         <div v-if="verificationError" class="text-xs text-destructive mt-1">{{ verificationError }}</div>
+        <div v-if="auth.user?.id" class="text-xs text-muted-foreground font-mono mt-1">
+          {{ $t('profile.uid') }} {{ auth.user.id }}
+        </div>
         <div v-if="auth.user?.alias" class="text-sm text-muted-foreground mt-0.5">
           @{{ auth.user.alias }}
         </div>
