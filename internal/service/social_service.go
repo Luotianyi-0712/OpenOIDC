@@ -92,6 +92,12 @@ func (s *SocialService) PeekState(ctx context.Context, state string) (*OAuthStat
 }
 
 func (s *SocialService) BeginBinding(ctx context.Context, userID uuid.UUID, provider, returnTo string) (string, error) {
+	if !s.isSettingEnabled(ctx, "social_login_enabled") {
+		return "", ErrSocialLoginDisabled
+	}
+	if !s.isSettingEnabled(ctx, "social_binding_enabled") {
+		return "", ErrSocialBindingDisabled
+	}
 	if !s.registry.IsEnabled(provider) {
 		return "", ErrProviderDisabled
 	}
@@ -142,6 +148,12 @@ func (s *SocialService) CompleteBinding(ctx context.Context, userID uuid.UUID, p
 	if stateData.Mode != oauthStateModeBind || stateData.Provider != provider || stateData.UserID != userID {
 		return nil, ErrInvalidToken
 	}
+	if !s.isSettingEnabled(ctx, "social_login_enabled") {
+		return nil, ErrSocialLoginDisabled
+	}
+	if !s.isSettingEnabled(ctx, "social_binding_enabled") {
+		return nil, ErrSocialBindingDisabled
+	}
 	prov, err := s.registry.Get(provider)
 	if err != nil {
 		return nil, ErrProviderDisabled
@@ -167,28 +179,7 @@ func (s *SocialService) CompleteBinding(ctx context.Context, userID uuid.UUID, p
 	}
 
 	now := time.Now().UTC()
-	var email, name *string
-	if info.Email != "" {
-		v := info.Email
-		email = &v
-	}
-	if info.DisplayName != "" {
-		v := info.DisplayName
-		name = &v
-	}
-	binding := &domain.SocialBinding{
-		ID:            uuid.New(),
-		UserID:        userID,
-		Provider:      provider,
-		ProviderUID:   info.ProviderUID,
-		ProviderEmail: email,
-		ProviderName:  name,
-		RawProfile:    info.RawProfile,
-		BoundAt:       now,
-		VerifiedAt:    &now,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}
+	binding := s.bindingFromProviderInfo(userID, provider, info, now)
 	if err := s.bindingRepo.Create(ctx, binding); err != nil {
 		return nil, fmt.Errorf("create binding: %w", err)
 	}
@@ -207,7 +198,7 @@ func (s *SocialService) CompleteBinding(ctx context.Context, userID uuid.UUID, p
 		Action:       "social.bound",
 		ResourceType: &rt,
 		ResourceID:   &rid,
-		Details:      map[string]any{"provider": provider, "provider_uid": info.ProviderUID},
+		Details:      map[string]any{"provider": provider, "provider_uid": info.ProviderUID, "auth_status": binding.LastAuthStatus},
 		CreatedAt:    now,
 	})
 
@@ -215,6 +206,9 @@ func (s *SocialService) CompleteBinding(ctx context.Context, userID uuid.UUID, p
 }
 
 func (s *SocialService) BeginSocialLogin(ctx context.Context, provider, returnTo string) (string, error) {
+	if !s.isSettingEnabled(ctx, "social_login_enabled") {
+		return "", ErrSocialLoginDisabled
+	}
 	if !s.registry.IsEnabled(provider) {
 		return "", ErrProviderDisabled
 	}
@@ -250,6 +244,9 @@ func (s *SocialService) CompleteSocialLogin(ctx context.Context, provider string
 	if stateData.Mode != oauthStateModeLogin || stateData.Provider != provider {
 		return nil, nil, ErrInvalidToken
 	}
+	if !s.isSettingEnabled(ctx, "social_login_enabled") {
+		return nil, nil, ErrSocialLoginDisabled
+	}
 	prov, err := s.registry.Get(provider)
 	if err != nil {
 		return nil, nil, ErrProviderDisabled
@@ -279,9 +276,15 @@ func (s *SocialService) CompleteSocialLogin(ctx context.Context, provider string
 		if err != nil {
 			return nil, nil, fmt.Errorf("lookup user: %w", err)
 		}
+		if err := s.updateBindingFromProviderInfo(ctx, binding, info, now); err != nil {
+			return nil, nil, fmt.Errorf("update binding auth status: %w", err)
+		}
 	} else {
 		if !s.isSettingEnabled(ctx, "registration_enabled") {
 			return nil, nil, ErrRegistrationDisabled
+		}
+		if !s.isSettingEnabled(ctx, "social_register_enabled") {
+			return nil, nil, ErrSocialRegistrationDisabled
 		}
 
 		if info.Email != "" {
@@ -324,28 +327,7 @@ func (s *SocialService) CompleteSocialLogin(ctx context.Context, provider string
 			})
 		}
 
-		var provEmail, provName *string
-		if info.Email != "" {
-			v := info.Email
-			provEmail = &v
-		}
-		if info.DisplayName != "" {
-			v := info.DisplayName
-			provName = &v
-		}
-		newBinding := &domain.SocialBinding{
-			ID:            uuid.New(),
-			UserID:        user.ID,
-			Provider:      provider,
-			ProviderUID:   info.ProviderUID,
-			ProviderEmail: provEmail,
-			ProviderName:  provName,
-			RawProfile:    info.RawProfile,
-			BoundAt:       now,
-			VerifiedAt:    &now,
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		}
+		newBinding := s.bindingFromProviderInfo(user.ID, provider, info, now)
 		if err := s.bindingRepo.Create(ctx, newBinding); err != nil {
 			return nil, nil, fmt.Errorf("create binding: %w", err)
 		}
@@ -469,8 +451,8 @@ func (s *SocialService) Unbind(ctx context.Context, userID uuid.UUID, provider s
 		}
 		return fmt.Errorf("lookup binding: %w", err)
 	}
-	if err := s.bindingRepo.Delete(ctx, userID, provider); err != nil {
-		return fmt.Errorf("delete binding: %w", err)
+	if err := s.bindingRepo.SoftUnbind(ctx, userID, provider, "user_request"); err != nil {
+		return fmt.Errorf("soft unbind: %w", err)
 	}
 	if s.securitySvc != nil {
 		if _, err := s.securitySvc.ComputeSecurityLevel(ctx, userID); err != nil {
@@ -485,7 +467,7 @@ func (s *SocialService) Unbind(ctx context.Context, userID uuid.UUID, provider s
 		Action:       "social.unbound",
 		ResourceType: &rt,
 		ResourceID:   &rid,
-		Details:      map[string]any{"provider": provider},
+		Details:      map[string]any{"provider": provider, "provider_uid": existing.ProviderUID, "reason": "user_request"},
 		CreatedAt:    time.Now().UTC(),
 	})
 	return nil
@@ -493,6 +475,221 @@ func (s *SocialService) Unbind(ctx context.Context, userID uuid.UUID, provider s
 
 func (s *SocialService) ListBindings(ctx context.Context, userID uuid.UUID) ([]*domain.SocialBinding, error) {
 	return s.bindingRepo.ListByUser(ctx, userID)
+}
+
+func (s *SocialService) SyncAuthorizationStatus(ctx context.Context, limit int, staleBefore time.Time) error {
+	bindings, err := s.bindingRepo.ListDueAuthChecks(ctx, staleBefore, limit)
+	if err != nil {
+		return fmt.Errorf("list due auth checks: %w", err)
+	}
+	for _, binding := range bindings {
+		if err := s.checkAuthorization(ctx, binding); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *SocialService) checkAuthorization(ctx context.Context, binding *domain.SocialBinding) error {
+	prov, err := s.registry.Get(binding.Provider)
+	now := time.Now().UTC()
+	if err != nil || !s.registry.IsEnabled(binding.Provider) {
+		binding.LastAuthCheckAt = &now
+		binding.LastAuthStatus = domain.SocialAuthStatusUnknown
+		msg := "provider disabled or unavailable"
+		binding.LastAuthError = &msg
+		return s.bindingRepo.Update(ctx, binding)
+	}
+	if !prov.SupportsRefresh() && binding.AccessToken == nil {
+		binding.LastAuthCheckAt = &now
+		binding.LastAuthStatus = domain.SocialAuthStatusUnsupported
+		binding.LastAuthError = nil
+		return s.bindingRepo.Update(ctx, binding)
+	}
+
+	if binding.RefreshToken != nil && *binding.RefreshToken != "" && prov.SupportsRefresh() {
+		token, refreshErr := prov.RefreshToken(ctx, *binding.RefreshToken)
+		if refreshErr != nil {
+			if isAuthorizationLostError(refreshErr) {
+				return s.markAuthorizationLost(ctx, binding, domain.SocialBindingStatusProviderRevoked, domain.SocialAuthStatusRevoked, refreshErr)
+			}
+			return s.markAuthorizationUnknown(ctx, binding, refreshErr)
+		}
+		s.applyToken(binding, token)
+		binding.LastAuthCheckAt = &now
+		binding.LastAuthStatus = domain.SocialAuthStatusActive
+		binding.LastAuthError = nil
+		return s.bindingRepo.Update(ctx, binding)
+	}
+
+	if binding.AccessToken == nil || *binding.AccessToken == "" {
+		binding.LastAuthCheckAt = &now
+		binding.LastAuthStatus = domain.SocialAuthStatusUnsupported
+		binding.LastAuthError = nil
+		return s.bindingRepo.Update(ctx, binding)
+	}
+	validator, ok := prov.(port.TokenValidatingProvider)
+	if !ok {
+		binding.LastAuthCheckAt = &now
+		binding.LastAuthStatus = domain.SocialAuthStatusUnsupported
+		binding.LastAuthError = nil
+		return s.bindingRepo.Update(ctx, binding)
+	}
+	info, validateErr := validator.ValidateToken(ctx, *binding.AccessToken)
+	if validateErr != nil {
+		if isAuthorizationLostError(validateErr) || (binding.TokenExpiry != nil && binding.TokenExpiry.Before(now)) {
+			status := domain.SocialBindingStatusProviderRevoked
+			authStatus := domain.SocialAuthStatusRevoked
+			if binding.TokenExpiry != nil && binding.TokenExpiry.Before(now) {
+				status = domain.SocialBindingStatusTokenExpired
+				authStatus = domain.SocialAuthStatusExpired
+			}
+			return s.markAuthorizationLost(ctx, binding, status, authStatus, validateErr)
+		}
+		return s.markAuthorizationUnknown(ctx, binding, validateErr)
+	}
+	s.applyProviderSnapshot(binding, info)
+	binding.LastAuthCheckAt = &now
+	binding.LastAuthStatus = domain.SocialAuthStatusActive
+	binding.LastAuthError = nil
+	return s.bindingRepo.Update(ctx, binding)
+}
+
+func (s *SocialService) markAuthorizationUnknown(ctx context.Context, binding *domain.SocialBinding, cause error) error {
+	now := time.Now().UTC()
+	binding.LastAuthCheckAt = &now
+	binding.LastAuthStatus = domain.SocialAuthStatusUnknown
+	msg := cause.Error()
+	binding.LastAuthError = &msg
+	return s.bindingRepo.Update(ctx, binding)
+}
+
+func isAuthorizationLostError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	markers := []string{
+		"invalid_grant",
+		"invalid token",
+		"token expired",
+		"expired token",
+		"revoked",
+		"unauthorized",
+		"forbidden",
+		"http 401",
+		"http 403",
+	}
+	for _, marker := range markers {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *SocialService) markAuthorizationLost(ctx context.Context, binding *domain.SocialBinding, status domain.SocialBindingStatus, authStatus domain.SocialAuthStatus, cause error) error {
+	now := time.Now().UTC()
+	binding.Status = status
+	binding.UnboundAt = &now
+	reason := string(authStatus)
+	binding.UnbindReason = &reason
+	binding.LastAuthCheckAt = &now
+	binding.LastAuthStatus = authStatus
+	msg := cause.Error()
+	binding.LastAuthError = &msg
+	binding.AccessToken = nil
+	binding.RefreshToken = nil
+	binding.TokenExpiry = nil
+	binding.TokenType = nil
+	binding.TokenScopes = nil
+	if err := s.bindingRepo.Update(ctx, binding); err != nil {
+		return err
+	}
+	if s.securitySvc != nil {
+		_, _ = s.securitySvc.ComputeSecurityLevel(ctx, binding.UserID)
+	}
+	s.audit(ctx, &binding.UserID, "social.authorization_lost", "social_binding", binding.ID.String(), nil, map[string]any{
+		"provider":      binding.Provider,
+		"provider_uid":  binding.ProviderUID,
+		"status":        status,
+		"auth_status":   authStatus,
+		"last_auth_err": msg,
+	})
+	return nil
+}
+
+func (s *SocialService) bindingFromProviderInfo(userID uuid.UUID, provider string, info *port.ProviderUserInfo, now time.Time) *domain.SocialBinding {
+	binding := &domain.SocialBinding{
+		ID:             uuid.New(),
+		UserID:         userID,
+		Provider:       provider,
+		ProviderUID:    info.ProviderUID,
+		RawProfile:     info.RawProfile,
+		BoundAt:        now,
+		VerifiedAt:     &now,
+		Status:         domain.SocialBindingStatusActive,
+		LastAuthStatus: domain.SocialAuthStatusUnsupported,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	s.applyProviderSnapshot(binding, info)
+	s.applyToken(binding, info.Token)
+	return binding
+}
+
+func (s *SocialService) updateBindingFromProviderInfo(ctx context.Context, binding *domain.SocialBinding, info *port.ProviderUserInfo, now time.Time) error {
+	binding.Status = domain.SocialBindingStatusActive
+	binding.UnboundAt = nil
+	binding.UnbindReason = nil
+	binding.VerifiedAt = &now
+	s.applyProviderSnapshot(binding, info)
+	s.applyToken(binding, info.Token)
+	return s.bindingRepo.Update(ctx, binding)
+}
+
+func (s *SocialService) applyProviderSnapshot(binding *domain.SocialBinding, info *port.ProviderUserInfo) {
+	if info == nil {
+		return
+	}
+	if info.Email != "" {
+		binding.ProviderEmail = ptrString(info.Email)
+	}
+	if info.DisplayName != "" {
+		binding.ProviderName = ptrString(info.DisplayName)
+	}
+	if info.AvatarURL != "" {
+		binding.ProviderAvatar = ptrString(info.AvatarURL)
+	}
+	if info.RawProfile != nil {
+		binding.RawProfile = info.RawProfile
+	}
+}
+
+func (s *SocialService) applyToken(binding *domain.SocialBinding, token *port.ProviderTokenInfo) {
+	if token == nil {
+		if binding.LastAuthStatus == "" {
+			binding.LastAuthStatus = domain.SocialAuthStatusUnsupported
+		}
+		return
+	}
+	if token.AccessToken != "" {
+		binding.AccessToken = ptrString(token.AccessToken)
+	}
+	if token.RefreshToken != "" {
+		binding.RefreshToken = ptrString(token.RefreshToken)
+	}
+	binding.TokenExpiry = token.Expiry
+	if token.TokenType != "" {
+		binding.TokenType = ptrString(token.TokenType)
+	}
+	binding.TokenScopes = append([]string(nil), token.Scopes...)
+	binding.LastAuthStatus = domain.SocialAuthStatusActive
+	binding.LastAuthError = nil
+}
+
+func ptrString(v string) *string {
+	return &v
 }
 
 func (s *SocialService) consumeState(ctx context.Context, state string) (*oauthStateData, error) {

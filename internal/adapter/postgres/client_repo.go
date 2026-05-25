@@ -21,24 +21,26 @@ func NewClientRepo(db *pgxpool.Pool) *ClientRepo {
 	return &ClientRepo{db: db}
 }
 
-const clientColumns = `id, client_id, client_secret_hash, client_secret_plain, name, description, logo_url, owner_id,
+const clientColumns = `id, client_id, client_secret_hash, client_secret_plain, name, description, logo_url, homepage_url, owner_id,
 	redirect_uris, grant_types, response_types, scopes, token_endpoint_auth_method,
-	min_security_level, protocol_type, is_active, is_public, created_at, updated_at`
+	min_security_level, require_email_verified, protocol_type, is_active, is_public, is_confidential, created_at, updated_at`
 
 func scanClient(row pgx.Row) (*domain.OIDCClient, error) {
 	var c domain.OIDCClient
 	var ownerID *uuid.UUID
 	var isPublic bool
 	err := row.Scan(
-		&c.ID, &c.ClientID, &c.ClientSecretHash, &c.ClientSecretPlain, &c.ClientName, &c.Description, &c.LogoURL, &ownerID,
+		&c.ID, &c.ClientID, &c.ClientSecretHash, &c.ClientSecretPlain, &c.ClientName, &c.Description, &c.LogoURL, &c.HomepageURL, &ownerID,
 		&c.RedirectURIs, &c.GrantTypes, &c.ResponseTypes, &c.Scopes, &c.TokenEndpointAuthMethod,
-		&c.MinSecurityLevel, &c.ProtocolType, &c.IsActive, &isPublic, &c.CreatedAt, &c.UpdatedAt,
+		&c.MinSecurityLevel, &c.RequireEmailVerified, &c.ProtocolType, &c.IsActive, &isPublic, &c.IsConfidential, &c.CreatedAt, &c.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 	c.OwnerUserID = ownerID
-	c.IsConfidential = !isPublic
+	if !c.IsConfidential && !isPublic {
+		c.IsConfidential = true
+	}
 	return &c, nil
 }
 
@@ -54,15 +56,15 @@ func (r *ClientRepo) Create(ctx context.Context, c *domain.OIDCClient) error {
 
 	query := `
 		INSERT INTO oidc_clients (
-			id, client_id, client_secret_hash, client_secret_plain, name, description, logo_url, owner_id,
+			id, client_id, client_secret_hash, client_secret_plain, name, description, logo_url, homepage_url, owner_id,
 			redirect_uris, grant_types, response_types, scopes, token_endpoint_auth_method,
-			min_security_level, protocol_type, is_active, is_public, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+			min_security_level, require_email_verified, protocol_type, is_active, is_public, is_confidential, created_at, updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
 	`
 	_, err := r.db.Exec(ctx, query,
-		c.ID, c.ClientID, c.ClientSecretHash, c.ClientSecretPlain, c.ClientName, c.Description, c.LogoURL, c.OwnerUserID,
+		c.ID, c.ClientID, c.ClientSecretHash, c.ClientSecretPlain, c.ClientName, c.Description, c.LogoURL, c.HomepageURL, c.OwnerUserID,
 		c.RedirectURIs, c.GrantTypes, c.ResponseTypes, c.Scopes, c.TokenEndpointAuthMethod,
-		c.MinSecurityLevel, c.ProtocolType, c.IsActive, !c.IsConfidential, c.CreatedAt, c.UpdatedAt,
+		c.MinSecurityLevel, c.RequireEmailVerified, c.ProtocolType, c.IsActive, !c.IsConfidential, c.IsConfidential, c.CreatedAt, c.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert client: %w", err)
@@ -162,17 +164,17 @@ func (r *ClientRepo) Update(ctx context.Context, c *domain.OIDCClient) error {
 	c.UpdatedAt = time.Now().UTC()
 	query := `
 		UPDATE oidc_clients SET
-			name = $2, description = $3, logo_url = $4,
-			redirect_uris = $5, grant_types = $6, response_types = $7, scopes = $8,
-			token_endpoint_auth_method = $9, min_security_level = $10, protocol_type = $11,
-			is_active = $12, is_public = $13, updated_at = $14
+			name = $2, description = $3, logo_url = $4, homepage_url = $5,
+			redirect_uris = $6, grant_types = $7, response_types = $8, scopes = $9,
+			token_endpoint_auth_method = $10, min_security_level = $11, require_email_verified = $12, protocol_type = $13,
+			is_active = $14, is_public = $15, is_confidential = $16, updated_at = $17
 		WHERE id = $1
 	`
 	tag, err := r.db.Exec(ctx, query,
-		c.ID, c.ClientName, c.Description, c.LogoURL,
+		c.ID, c.ClientName, c.Description, c.LogoURL, c.HomepageURL,
 		c.RedirectURIs, c.GrantTypes, c.ResponseTypes, c.Scopes,
-		c.TokenEndpointAuthMethod, c.MinSecurityLevel, c.ProtocolType,
-		c.IsActive, !c.IsConfidential, c.UpdatedAt,
+		c.TokenEndpointAuthMethod, c.MinSecurityLevel, c.RequireEmailVerified, c.ProtocolType,
+		c.IsActive, !c.IsConfidential, c.IsConfidential, c.UpdatedAt,
 	)
 	if err != nil {
 		return err

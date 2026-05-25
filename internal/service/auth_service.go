@@ -46,6 +46,10 @@ func NewAuthService(
 }
 
 func (s *AuthService) Register(ctx context.Context, email, password, displayName string) (*domain.User, error) {
+	if !s.isSettingEnabled(ctx, "registration_enabled") {
+		return nil, ErrRegistrationDisabled
+	}
+
 	email = strings.ToLower(strings.TrimSpace(email))
 	if _, err := mail.ParseAddress(email); err != nil {
 		return nil, ErrInvalidEmail
@@ -131,6 +135,10 @@ func (s *AuthService) Register(ctx context.Context, email, password, displayName
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password, ip, userAgent string) (*domain.UserSession, error) {
+	if !s.isSettingEnabled(ctx, "password_login_enabled") {
+		return nil, ErrPasswordLoginDisabled
+	}
+
 	email = strings.ToLower(strings.TrimSpace(email))
 
 	// Check login lockout before anything else.
@@ -389,6 +397,17 @@ func (s *AuthService) createSession(ctx context.Context, userID uuid.UUID, ip, u
 		return nil, fmt.Errorf("create session: %w", err)
 	}
 	return session, nil
+}
+
+func (s *AuthService) isSettingEnabled(ctx context.Context, key string) bool {
+	if s.settingsRepo == nil {
+		return true
+	}
+	setting, err := s.settingsRepo.Get(ctx, key)
+	if err != nil || setting == nil || setting.Value == "" {
+		return true
+	}
+	return setting.Value != "false"
 }
 
 func (s *AuthService) validatePassword(password string) error {

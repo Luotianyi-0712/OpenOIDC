@@ -36,7 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_risk_list_user_id ON risk_list(user_id) WHERE use
 
 -- Add missing columns to oidc_clients
 ALTER TABLE oidc_clients ADD COLUMN IF NOT EXISTS client_secret_plain TEXT NOT NULL DEFAULT '';
-ALTER TABLE oidc_clients ADD COLUMN IF NOT EXISTS require_email_verified BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE oidc_clients ADD COLUMN IF NOT EXISTS require_email_verified BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE oidc_clients ADD COLUMN IF NOT EXISTS is_confidential BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Add subject column to oauth2_sessions if using unified table (for forward compatibility)

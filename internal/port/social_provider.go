@@ -3,7 +3,16 @@ package port
 import (
 	"context"
 	"net/http"
+	"time"
 )
+
+type ProviderTokenInfo struct {
+	AccessToken  string
+	RefreshToken string
+	Expiry       *time.Time
+	TokenType    string
+	Scopes       []string
+}
 
 type ProviderUserInfo struct {
 	ProviderUID   string
@@ -12,6 +21,7 @@ type ProviderUserInfo struct {
 	DisplayName   string
 	AvatarURL     string
 	RawProfile    map[string]any
+	Token         *ProviderTokenInfo
 }
 
 type SocialProvider interface {
@@ -19,7 +29,11 @@ type SocialProvider interface {
 	BeginAuth(ctx context.Context, state string, redirectURL string) (authURL string, err error)
 	CompleteAuth(ctx context.Context, r *http.Request) (*ProviderUserInfo, error)
 	SupportsRefresh() bool
-	RefreshToken(ctx context.Context, refreshToken string) (newAccess, newRefresh string, err error)
+	RefreshToken(ctx context.Context, refreshToken string) (*ProviderTokenInfo, error)
+}
+
+type TokenValidatingProvider interface {
+	ValidateToken(ctx context.Context, accessToken string) (*ProviderUserInfo, error)
 }
 
 type SocialProviderRegistry interface {

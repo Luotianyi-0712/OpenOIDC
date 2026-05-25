@@ -208,6 +208,14 @@ func mapAuthError(w http.ResponseWriter, err error) {
 		Error(w, http.StatusBadRequest, "invalid_email", err.Error())
 	case errors.Is(err, service.ErrInvalidInput):
 		Error(w, http.StatusBadRequest, "invalid_input", err.Error())
+	case errors.Is(err, service.ErrRegistrationDisabled):
+		Error(w, http.StatusForbidden, "registration_disabled", "registration is disabled")
+	case errors.Is(err, service.ErrPasswordLoginDisabled):
+		Error(w, http.StatusForbidden, "password_login_disabled", "password login is disabled")
+	case errors.Is(err, service.ErrSocialLoginDisabled):
+		Error(w, http.StatusForbidden, "social_login_disabled", "social login is disabled")
+	case errors.Is(err, service.ErrSocialRegistrationDisabled):
+		Error(w, http.StatusForbidden, "social_registration_disabled", "social registration is disabled")
 	default:
 		Error(w, http.StatusInternalServerError, "internal", "internal server error")
 	}

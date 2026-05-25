@@ -31,11 +31,12 @@ type UserRepository interface {
 
 type BindingRepository interface {
 	Create(ctx context.Context, b *domain.SocialBinding) error
+	Update(ctx context.Context, b *domain.SocialBinding) error
 	GetByProviderUID(ctx context.Context, provider, uid string) (*domain.SocialBinding, error)
 	ListByUser(ctx context.Context, userID uuid.UUID) ([]*domain.SocialBinding, error)
 	GetByUserAndProvider(ctx context.Context, userID uuid.UUID, provider string) (*domain.SocialBinding, error)
-	Delete(ctx context.Context, userID uuid.UUID, provider string) error
-	UpdateTokens(ctx context.Context, id uuid.UUID, access, refresh string, expiry *time.Time) error
+	SoftUnbind(ctx context.Context, userID uuid.UUID, provider, reason string) error
+	ListDueAuthChecks(ctx context.Context, before time.Time, limit int) ([]*domain.SocialBinding, error)
 }
 
 type ClientRepository interface {

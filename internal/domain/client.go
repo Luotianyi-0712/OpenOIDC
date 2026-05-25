@@ -14,6 +14,7 @@ type OIDCClient struct {
 	ClientName              string     `json:"client_name"`
 	Description             string     `json:"description"`
 	LogoURL                 string     `json:"logo_url"`
+	HomepageURL             string     `json:"homepage_url"`
 	OwnerUserID             *uuid.UUID `json:"owner_user_id,omitempty"`
 	RedirectURIs            []string   `json:"redirect_uris"`
 	GrantTypes              []string   `json:"grant_types"`

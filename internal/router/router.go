@@ -103,6 +103,7 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Get("/me/authorized-apps", d.UserInfoHandler.ListAuthorizedApps)
 			r.Delete("/me/authorized-apps/{clientId}", d.UserInfoHandler.RevokeAuthorizedApp)
 
+			r.Get("/consent/context", d.OIDCHandler.ConsentContext)
 			r.Post("/consent/accept", d.OIDCHandler.ConsentAccept)
 			r.Post("/consent/reject", d.OIDCHandler.ConsentReject)
 		})
@@ -110,6 +111,7 @@ func NewRouter(d Deps) *chi.Mux {
 		// Developer routes (authenticated users with sufficient security level).
 		r.Route("/developer", func(r chi.Router) {
 			r.Use(mw.SessionAuth(d.SessionService, d.CookieName))
+			r.Use(mw.DeveloperOnly(d.UserRepo, d.SettingsRepo))
 			r.Get("/apps", d.DeveloperHandler.ListApps)
 			r.Post("/apps", d.DeveloperHandler.CreateApp)
 			r.Get("/apps/{id}", d.DeveloperHandler.GetApp)

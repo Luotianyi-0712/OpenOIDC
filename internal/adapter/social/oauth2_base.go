@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
 
@@ -59,10 +61,48 @@ func (p *OAuth2Provider) CompleteAuth(ctx context.Context, r *http.Request) (*po
 
 	client := cfg.Client(ctx, token)
 
+	var info *port.ProviderUserInfo
+	if p.fetchUser != nil {
+		info, err = p.fetchUser(ctx, client, token)
+	} else {
+		body, fetchErr := doGet(ctx, client, p.userURL)
+		if fetchErr != nil {
+			return nil, fmt.Errorf("fetch user info: %w", fetchErr)
+		}
+		info, err = p.parseUser(body)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("parse user info: %w", err)
+	}
+	info.Token = oauthTokenInfo(token, p.config.Scopes)
+	return info, nil
+}
+
+func (p *OAuth2Provider) SupportsRefresh() bool {
+	return true
+}
+
+func (p *OAuth2Provider) RefreshToken(ctx context.Context, refreshToken string) (*port.ProviderTokenInfo, error) {
+	if refreshToken == "" {
+		return nil, fmt.Errorf("empty refresh token")
+	}
+	tokenSource := p.config.TokenSource(ctx, &oauth2.Token{RefreshToken: refreshToken})
+	newToken, err := tokenSource.Token()
+	if err != nil {
+		return nil, fmt.Errorf("refresh token: %w", err)
+	}
+	return oauthTokenInfo(newToken, p.config.Scopes), nil
+}
+
+func (p *OAuth2Provider) ValidateToken(ctx context.Context, accessToken string) (*port.ProviderUserInfo, error) {
+	if strings.TrimSpace(accessToken) == "" {
+		return nil, fmt.Errorf("empty access token")
+	}
+	token := &oauth2.Token{AccessToken: accessToken, TokenType: "Bearer"}
+	client := p.config.Client(ctx, token)
 	if p.fetchUser != nil {
 		return p.fetchUser(ctx, client, token)
 	}
-
 	body, err := doGet(ctx, client, p.userURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch user info: %w", err)
@@ -74,20 +114,22 @@ func (p *OAuth2Provider) CompleteAuth(ctx context.Context, r *http.Request) (*po
 	return info, nil
 }
 
-func (p *OAuth2Provider) SupportsRefresh() bool {
-	return true
-}
-
-func (p *OAuth2Provider) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
-	if refreshToken == "" {
-		return "", "", fmt.Errorf("empty refresh token")
+func oauthTokenInfo(token *oauth2.Token, scopes []string) *port.ProviderTokenInfo {
+	if token == nil {
+		return nil
 	}
-	tokenSource := p.config.TokenSource(ctx, &oauth2.Token{RefreshToken: refreshToken})
-	newToken, err := tokenSource.Token()
-	if err != nil {
-		return "", "", fmt.Errorf("refresh token: %w", err)
+	var expiry *time.Time
+	if !token.Expiry.IsZero() {
+		exp := token.Expiry.UTC()
+		expiry = &exp
 	}
-	return newToken.AccessToken, newToken.RefreshToken, nil
+	return &port.ProviderTokenInfo{
+		AccessToken:  token.AccessToken,
+		RefreshToken: token.RefreshToken,
+		Expiry:       expiry,
+		TokenType:    token.TokenType,
+		Scopes:       append([]string(nil), scopes...),
+	}
 }
 
 func (p *OAuth2Provider) cloneWithRedirect(redirectURL string) *oauth2.Config {

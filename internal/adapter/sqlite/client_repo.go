@@ -21,7 +21,7 @@ func NewClientRepo(db *sql.DB) *ClientRepo {
 	return &ClientRepo{db: db}
 }
 
-const clientColumns = `id, client_id, client_secret_hash, client_secret_plain, client_name, description, logo_url, owner_user_id,
+const clientColumns = `id, client_id, client_secret_hash, client_secret_plain, client_name, description, logo_url, homepage_url, owner_user_id,
 	redirect_uris, grant_types, response_types, scopes, token_endpoint_auth_method,
 	min_security_level, require_email_verified, protocol_type, is_active, is_confidential,
 	created_at, updated_at`
@@ -33,7 +33,7 @@ func scanClient(row interface{ Scan(dest ...any) error }) (*domain.OIDCClient, e
 	var redirectURIs, grantTypes, responseTypes, scopes string
 
 	err := row.Scan(
-		&id, &c.ClientID, &c.ClientSecretHash, &c.ClientSecretPlain, &c.ClientName, &c.Description, &c.LogoURL, &ownerUserID,
+		&id, &c.ClientID, &c.ClientSecretHash, &c.ClientSecretPlain, &c.ClientName, &c.Description, &c.LogoURL, &c.HomepageURL, &ownerUserID,
 		&redirectURIs, &grantTypes, &responseTypes, &scopes, &c.TokenEndpointAuthMethod,
 		&c.MinSecurityLevel, &c.RequireEmailVerified, &c.ProtocolType, &c.IsActive, &c.IsConfidential,
 		&c.CreatedAt, &c.UpdatedAt,
@@ -97,14 +97,14 @@ func (r *ClientRepo) Create(ctx context.Context, c *domain.OIDCClient) error {
 
 	query := `
 		INSERT INTO oidc_clients (
-			id, client_id, client_secret_hash, client_secret_plain, client_name, description, logo_url, owner_user_id,
+			id, client_id, client_secret_hash, client_secret_plain, client_name, description, logo_url, homepage_url, owner_user_id,
 			redirect_uris, grant_types, response_types, scopes, token_endpoint_auth_method,
 			min_security_level, require_email_verified, protocol_type, is_active, is_confidential,
 			created_at, updated_at
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 	`
 	_, err := r.db.ExecContext(ctx, query,
-		c.ID.String(), c.ClientID, c.ClientSecretHash, c.ClientSecretPlain, c.ClientName, c.Description, c.LogoURL,
+		c.ID.String(), c.ClientID, c.ClientSecretHash, c.ClientSecretPlain, c.ClientName, c.Description, c.LogoURL, c.HomepageURL,
 		ownerUserIDToNullString(c.OwnerUserID),
 		marshalStringSlice(c.RedirectURIs), marshalStringSlice(c.GrantTypes),
 		marshalStringSlice(c.ResponseTypes), marshalStringSlice(c.Scopes),
@@ -210,14 +210,14 @@ func (r *ClientRepo) Update(ctx context.Context, c *domain.OIDCClient) error {
 	c.UpdatedAt = time.Now().UTC()
 	query := `
 		UPDATE oidc_clients SET
-			client_name = ?, description = ?, logo_url = ?,
+			client_name = ?, description = ?, logo_url = ?, homepage_url = ?,
 			redirect_uris = ?, grant_types = ?, response_types = ?, scopes = ?,
 			token_endpoint_auth_method = ?, min_security_level = ?, require_email_verified = ?,
 			protocol_type = ?, is_active = ?, is_confidential = ?, updated_at = ?
 		WHERE id = ?
 	`
 	res, err := r.db.ExecContext(ctx, query,
-		c.ClientName, c.Description, c.LogoURL,
+		c.ClientName, c.Description, c.LogoURL, c.HomepageURL,
 		marshalStringSlice(c.RedirectURIs), marshalStringSlice(c.GrantTypes),
 		marshalStringSlice(c.ResponseTypes), marshalStringSlice(c.Scopes),
 		c.TokenEndpointAuthMethod, c.MinSecurityLevel, c.RequireEmailVerified,

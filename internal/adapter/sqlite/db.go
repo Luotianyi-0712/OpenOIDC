@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -71,15 +72,23 @@ func RunMigrations(db *sql.DB) error {
 		provider_uid TEXT NOT NULL,
 		provider_email TEXT,
 		provider_name TEXT,
+		provider_avatar TEXT,
+		status TEXT NOT NULL DEFAULT 'active',
 		access_token TEXT,
 		refresh_token TEXT,
 		token_expiry DATETIME,
+		token_type TEXT,
+		token_scopes TEXT,
 		raw_profile TEXT,
 		bound_at DATETIME NOT NULL,
 		verified_at DATETIME,
+		unbound_at DATETIME,
+		unbind_reason TEXT,
+		last_auth_check_at DATETIME,
+		last_auth_status TEXT NOT NULL DEFAULT 'unknown',
+		last_auth_error TEXT,
 		created_at DATETIME NOT NULL,
-		updated_at DATETIME NOT NULL,
-		UNIQUE(provider, provider_uid)
+		updated_at DATETIME NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS oidc_clients (
@@ -90,6 +99,7 @@ func RunMigrations(db *sql.DB) error {
 		client_name TEXT NOT NULL DEFAULT '',
 		description TEXT NOT NULL DEFAULT '',
 		logo_url TEXT NOT NULL DEFAULT '',
+		homepage_url TEXT NOT NULL DEFAULT '',
 		owner_user_id TEXT,
 		redirect_uris TEXT NOT NULL DEFAULT '[]',
 		grant_types TEXT NOT NULL DEFAULT '[]',
@@ -245,24 +255,108 @@ func RunMigrations(db *sql.DB) error {
 	// Add columns for existing databases (idempotent).
 	alterStmts := []string{
 		`ALTER TABLE oidc_clients ADD COLUMN client_secret_plain TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE oidc_clients ADD COLUMN homepage_url TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE oidc_clients ADD COLUMN require_email_verified BOOLEAN NOT NULL DEFAULT 0`,
 		`ALTER TABLE oidc_clients ADD COLUMN is_confidential BOOLEAN NOT NULL DEFAULT 1`,
 		`ALTER TABLE oauth2_sessions ADD COLUMN subject TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE social_bindings ADD COLUMN provider_avatar TEXT`,
+		`ALTER TABLE social_bindings ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`,
+		`ALTER TABLE social_bindings ADD COLUMN token_type TEXT`,
+		`ALTER TABLE social_bindings ADD COLUMN token_scopes TEXT`,
+		`ALTER TABLE social_bindings ADD COLUMN unbound_at DATETIME`,
+		`ALTER TABLE social_bindings ADD COLUMN unbind_reason TEXT`,
+		`ALTER TABLE social_bindings ADD COLUMN last_auth_check_at DATETIME`,
+		`ALTER TABLE social_bindings ADD COLUMN last_auth_status TEXT NOT NULL DEFAULT 'unknown'`,
+		`ALTER TABLE social_bindings ADD COLUMN last_auth_error TEXT`,
 	}
 	for _, stmt := range alterStmts {
 		db.Exec(stmt) // ignore "duplicate column" errors
+	}
+
+	if err := migrateSocialBindingsLifecycle(db); err != nil {
+		return err
 	}
 
 	indexStmts := []string{
 		`CREATE INDEX IF NOT EXISTS idx_oauth2_sessions_subject ON oauth2_sessions(subject)`,
 		`CREATE INDEX IF NOT EXISTS idx_oauth2_sessions_type_active ON oauth2_sessions(session_type, active)`,
 		`CREATE INDEX IF NOT EXISTS idx_oauth2_sessions_client_active ON oauth2_sessions(client_id, active)`,
+		`CREATE INDEX IF NOT EXISTS idx_social_bindings_user_id ON social_bindings(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_social_bindings_provider ON social_bindings(provider)`,
+		`CREATE INDEX IF NOT EXISTS idx_social_bindings_auth_due ON social_bindings(last_auth_check_at) WHERE status = 'active'`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_social_bindings_active_provider_uid ON social_bindings(provider, provider_uid) WHERE status = 'active'`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_social_bindings_active_user_provider ON social_bindings(user_id, provider) WHERE status = 'active'`,
 	}
 	for _, stmt := range indexStmts {
 		db.Exec(stmt)
 	}
 
 	return nil
+}
+
+func migrateSocialBindingsLifecycle(db *sql.DB) error {
+	var createSQL string
+	if err := db.QueryRow(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'social_bindings'`).Scan(&createSQL); err != nil {
+		return fmt.Errorf("inspect social_bindings schema: %w", err)
+	}
+	if createSQL == "" || !containsLegacySocialBindingUnique(createSQL) {
+		return nil
+	}
+
+	migration := `
+		PRAGMA foreign_keys=OFF;
+		CREATE TABLE IF NOT EXISTS social_bindings_v2 (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id),
+			provider TEXT NOT NULL,
+			provider_uid TEXT NOT NULL,
+			provider_email TEXT,
+			provider_name TEXT,
+			provider_avatar TEXT,
+			status TEXT NOT NULL DEFAULT 'active',
+			access_token TEXT,
+			refresh_token TEXT,
+			token_expiry DATETIME,
+			token_type TEXT,
+			token_scopes TEXT,
+			raw_profile TEXT,
+			bound_at DATETIME NOT NULL,
+			verified_at DATETIME,
+			unbound_at DATETIME,
+			unbind_reason TEXT,
+			last_auth_check_at DATETIME,
+			last_auth_status TEXT NOT NULL DEFAULT 'unknown',
+			last_auth_error TEXT,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL
+		);
+		INSERT OR IGNORE INTO social_bindings_v2 (
+			id, user_id, provider, provider_uid, provider_email, provider_name, provider_avatar,
+			status, access_token, refresh_token, token_expiry, token_type, token_scopes, raw_profile,
+			bound_at, verified_at, unbound_at, unbind_reason, last_auth_check_at, last_auth_status, last_auth_error,
+			created_at, updated_at
+		)
+		SELECT
+			id, user_id, provider, provider_uid, provider_email, provider_name, NULL,
+			COALESCE(status, 'active'), access_token, refresh_token, token_expiry, token_type, token_scopes, raw_profile,
+			bound_at, verified_at, unbound_at, unbind_reason, last_auth_check_at, COALESCE(last_auth_status, 'unknown'), last_auth_error,
+			created_at, updated_at
+		FROM social_bindings;
+		DROP TABLE social_bindings;
+		ALTER TABLE social_bindings_v2 RENAME TO social_bindings;
+		PRAGMA foreign_keys=ON;
+	`
+	if _, err := db.Exec(migration); err != nil {
+		return fmt.Errorf("migrate social_bindings lifecycle: %w", err)
+	}
+	return nil
+}
+
+func containsLegacySocialBindingUnique(createSQL string) bool {
+	compact := strings.ToLower(strings.ReplaceAll(createSQL, " ", ""))
+	compact = strings.ReplaceAll(compact, "\n", "")
+	compact = strings.ReplaceAll(compact, "\t", "")
+	return strings.Contains(compact, "unique(provider,provider_uid)")
 }
 
 // toNullString converts a *string to sql.NullString.

@@ -101,10 +101,12 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 		cleanup = chainCleanup(cleanup, func() { db.Close() })
 		pgPool = db
 
-		if migrationsPath := os.Getenv("OIDC_MIGRATIONS_PATH"); migrationsPath != "" {
-			if err := postgres.RunMigrations(cfg.Database, migrationsPath); err != nil {
-				slog.Warn("run migrations", "error", err)
-			}
+		migrationsPath := os.Getenv("OIDC_MIGRATIONS_PATH")
+		if migrationsPath == "" {
+			migrationsPath = "db/migrations"
+		}
+		if err := postgres.RunMigrations(cfg.Database, migrationsPath); err != nil {
+			slog.Warn("run migrations", "path", migrationsPath, "error", err)
 		}
 
 		redisCache, err := redis.NewCache(ctx, cfg.Redis)
@@ -186,7 +188,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 		allowedOrigins = strings.Split(v, ",")
 	}
 
-	startBackgroundJobs(ctx, sessionRepo, securitySvc)
+	startBackgroundJobs(ctx, sessionRepo, securitySvc, socialSvc, cfg.SocialAuthSync)
 
 	if cfg.Admin.Email != "" && cfg.Admin.Password != "" {
 		if err := seedAdmin(ctx, userRepo, cfg.Admin); err != nil {
@@ -393,6 +395,7 @@ func seedSettings(ctx context.Context, repo port.SettingsRepository) {
 		"password_login_enabled":  "true",
 		"social_login_enabled":    "true",
 		"social_register_enabled": "true",
+		"social_binding_enabled":  "true",
 	}
 	for key, value := range defaults {
 		if _, err := repo.Get(ctx, key); err != nil {
@@ -404,7 +407,7 @@ func seedSettings(ctx context.Context, repo port.SettingsRepository) {
 	}
 }
 
-func startBackgroundJobs(ctx context.Context, sessionRepo port.SessionRepository, securitySvc *service.SecurityLevelService) {
+func startBackgroundJobs(ctx context.Context, sessionRepo port.SessionRepository, securitySvc *service.SecurityLevelService, socialSvc *service.SocialService, socialSync config.SocialAuthSyncConfig) {
 	go func() {
 		ticker := time.NewTicker(15 * time.Minute)
 		defer ticker.Stop()
@@ -434,4 +437,30 @@ func startBackgroundJobs(ctx context.Context, sessionRepo port.SessionRepository
 			}
 		}
 	}()
+
+	if socialSync.Enabled && socialSvc != nil {
+		interval := socialSync.Interval
+		if interval <= 0 {
+			interval = time.Hour
+		}
+		batchSize := socialSync.BatchSize
+		if batchSize <= 0 {
+			batchSize = 100
+		}
+		go func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					staleBefore := time.Now().UTC().Add(-interval)
+					if err := socialSvc.SyncAuthorizationStatus(ctx, batchSize, staleBefore); err != nil {
+						slog.Warn("sync social authorization status", "error", err)
+					}
+				}
+			}
+		}()
+	}
 }

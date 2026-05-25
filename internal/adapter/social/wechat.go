@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/anthropic/oidc-platform/internal/domain"
 	"github.com/anthropic/oidc-platform/internal/port"
@@ -122,14 +124,15 @@ func (p *WeChatProvider) CompleteAuth(ctx context.Context, r *http.Request) (*po
 		DisplayName: info.Nickname,
 		AvatarURL:   info.HeadImgURL,
 		RawProfile:  raw,
+		Token:       wechatTokenInfo(tok),
 	}, nil
 }
 
 func (p *WeChatProvider) SupportsRefresh() bool { return true }
 
-func (p *WeChatProvider) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+func (p *WeChatProvider) RefreshToken(ctx context.Context, refreshToken string) (*port.ProviderTokenInfo, error) {
 	if refreshToken == "" {
-		return "", "", fmt.Errorf("empty refresh token")
+		return nil, fmt.Errorf("empty refresh token")
 	}
 	params := url.Values{}
 	params.Set("appid", p.appID)
@@ -138,16 +141,42 @@ func (p *WeChatProvider) RefreshToken(ctx context.Context, refreshToken string) 
 
 	body, err := wechatGet(ctx, wechatRefresh+"?"+params.Encode())
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	var tok wechatTokenResp
 	if err := json.Unmarshal(body, &tok); err != nil {
-		return "", "", err
+		return nil, err
 	}
 	if tok.ErrCode != 0 {
-		return "", "", fmt.Errorf("wechat refresh error %d: %s", tok.ErrCode, tok.ErrMsg)
+		return nil, fmt.Errorf("wechat refresh error %d: %s", tok.ErrCode, tok.ErrMsg)
 	}
-	return tok.AccessToken, tok.RefreshToken, nil
+	return wechatTokenInfo(tok), nil
+}
+
+func (p *WeChatProvider) ValidateToken(ctx context.Context, accessToken string) (*port.ProviderUserInfo, error) {
+	if strings.TrimSpace(accessToken) == "" {
+		return nil, fmt.Errorf("empty access token")
+	}
+	return nil, fmt.Errorf("wechat validation requires openid from token response")
+}
+
+func wechatTokenInfo(tok wechatTokenResp) *port.ProviderTokenInfo {
+	var expiry *time.Time
+	if tok.ExpiresIn > 0 {
+		exp := time.Now().UTC().Add(time.Duration(tok.ExpiresIn) * time.Second)
+		expiry = &exp
+	}
+	var scopes []string
+	if tok.Scope != "" {
+		scopes = strings.FieldsFunc(tok.Scope, func(r rune) bool { return r == ',' || r == ' ' })
+	}
+	return &port.ProviderTokenInfo{
+		AccessToken:  tok.AccessToken,
+		RefreshToken: tok.RefreshToken,
+		Expiry:       expiry,
+		TokenType:    "Bearer",
+		Scopes:       scopes,
+	}
 }
 
 func wechatGet(ctx context.Context, url string) ([]byte, error) {

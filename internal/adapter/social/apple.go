@@ -165,18 +165,19 @@ func (p *AppleProvider) CompleteAuth(ctx context.Context, r *http.Request) (*por
 		Email:       email,
 		DisplayName: displayName,
 		RawProfile:  raw,
+		Token:       appleTokenInfo(tokenResp),
 	}, nil
 }
 
 func (p *AppleProvider) SupportsRefresh() bool { return true }
 
-func (p *AppleProvider) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+func (p *AppleProvider) RefreshToken(ctx context.Context, refreshToken string) (*port.ProviderTokenInfo, error) {
 	if refreshToken == "" {
-		return "", "", fmt.Errorf("empty refresh token")
+		return nil, fmt.Errorf("empty refresh token")
 	}
 	secret, err := p.generateClientSecret()
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	form := url.Values{}
 	form.Set("client_id", p.clientID)
@@ -186,28 +187,43 @@ func (p *AppleProvider) RefreshToken(ctx context.Context, refreshToken string) (
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, appleTokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	var tokenResp appleTokenResp
 	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		return "", "", err
+		return nil, err
 	}
 	if tokenResp.Error != "" {
-		return "", "", fmt.Errorf("apple refresh error: %s", tokenResp.Error)
+		return nil, fmt.Errorf("apple refresh error: %s", tokenResp.Error)
 	}
-	return tokenResp.AccessToken, tokenResp.RefreshToken, nil
+	return appleTokenInfo(tokenResp), nil
+}
+
+func appleTokenInfo(tok appleTokenResp) *port.ProviderTokenInfo {
+	var expiry *time.Time
+	if tok.ExpiresIn > 0 {
+		exp := time.Now().UTC().Add(time.Duration(tok.ExpiresIn) * time.Second)
+		expiry = &exp
+	}
+	return &port.ProviderTokenInfo{
+		AccessToken:  tok.AccessToken,
+		RefreshToken: tok.RefreshToken,
+		Expiry:       expiry,
+		TokenType:    tok.TokenType,
+		Scopes:       []string{"name", "email"},
+	}
 }
 
 func (p *AppleProvider) generateClientSecret() (string, error) {

@@ -54,12 +54,16 @@ func (h *OIDCHandler) SetCache(cache port.Cache) {
 
 // consentChallenge stores the OIDC authorize request info so we can resume after user consent.
 type consentChallenge struct {
-	UserID      string   `json:"user_id"`
-	ClientID    string   `json:"client_id"`
-	ClientName  string   `json:"client_name"`
-	Scopes      []string `json:"scopes"`
-	RedirectURI string   `json:"redirect_uri"`
-	RequestURL  string   `json:"request_url"`
+	UserID            string   `json:"user_id"`
+	ClientID          string   `json:"client_id"`
+	ClientName        string   `json:"client_name"`
+	ClientDescription string   `json:"client_description"`
+	ClientLogoURL     string   `json:"client_logo_url"`
+	DeveloperID       string   `json:"developer_id"`
+	WebsiteURL        string   `json:"website_url"`
+	Scopes            []string `json:"scopes"`
+	RedirectURI       string   `json:"redirect_uri"`
+	RequestURL        string   `json:"request_url"`
 }
 
 // Authorize handles GET /oauth2/authorize.
@@ -97,6 +101,11 @@ func (h *OIDCHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 			fosite.ErrAccessDenied.WithHint("security level insufficient for this client"))
 		return
 	}
+	if client.RequireEmailVerified && !user.EmailVerified {
+		h.provider.WriteAuthorizeError(ctx, w, ar,
+			fosite.ErrAccessDenied.WithHint("email verification required for this client"))
+		return
+	}
 
 	if ok, reason := h.accessCtrl.CheckAccess(ctx, client, user, clientIP(r)); !ok {
 		h.provider.WriteAuthorizeError(ctx, w, ar,
@@ -104,10 +113,57 @@ func (h *OIDCHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If a consent UI is needed, redirect to it with a challenge token.
-	// For now, we use auto-consent (skip the consent screen) since the ConsentAccept
-	// endpoint can be called by the frontend if needed.
-	// Auto-consent: grant all requested scopes and issue response.
+	consentToken := r.URL.Query().Get("consent_challenge")
+	if consentToken == "" {
+		if h.cache == nil {
+			h.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrServerError.WithHint("consent cache unavailable"))
+			return
+		}
+		developerID := "platform"
+		if client.OwnerUserID != nil {
+			developerID = client.OwnerUserID.String()
+		}
+		redirectURI := ar.GetRedirectURI().String()
+		challenge := &consentChallenge{
+			UserID:            user.ID.String(),
+			ClientID:          client.ClientID,
+			ClientName:        client.ClientName,
+			ClientDescription: client.Description,
+			ClientLogoURL:     client.LogoURL,
+			DeveloperID:       developerID,
+			WebsiteURL:        client.HomepageURL,
+			Scopes:            ar.GetRequestedScopes(),
+			RedirectURI:       redirectURI,
+			RequestURL:        r.URL.RequestURI(),
+		}
+		token, err := h.storeConsentChallenge(r, challenge)
+		if err != nil {
+			h.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrServerError.WithWrap(err))
+			return
+		}
+		consentURL := "/authorize?" + url.Values{
+			"consent_challenge": {token},
+		}.Encode()
+		http.Redirect(w, r, consentURL, http.StatusFound)
+		return
+	}
+	if h.cache == nil {
+		h.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrServerError.WithHint("consent cache unavailable"))
+		return
+	}
+	acceptedData, err := h.cache.Get(ctx, "consent_accepted:"+consentToken)
+	if err != nil {
+		h.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrAccessDenied.WithHint("consent challenge not accepted"))
+		return
+	}
+	_ = h.cache.Delete(ctx, "consent_accepted:"+consentToken)
+	var accepted consentChallenge
+	if err := json.Unmarshal(acceptedData, &accepted); err != nil || !consentChallengeMatches(accepted, user.ID.String(), client.ClientID, ar.GetRedirectURI().String(), ar.GetRequestedScopes()) {
+		h.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrAccessDenied.WithHint("consent challenge does not match request"))
+		return
+	}
+
+	// User accepted consent: grant all requested scopes and issue response.
 	for _, scope := range ar.GetRequestedScopes() {
 		ar.GrantScope(scope)
 	}
@@ -222,6 +278,44 @@ func (h *OIDCHandler) UserInfo(w http.ResponseWriter, r *http.Request) {
 	Raw(w, http.StatusOK, payload)
 }
 
+// ConsentContext handles GET /api/v1/consent/context.
+func (h *OIDCHandler) ConsentContext(w http.ResponseWriter, r *http.Request) {
+	challengeID := r.URL.Query().Get("consent_challenge")
+	if challengeID == "" || h.cache == nil {
+		Error(w, http.StatusBadRequest, "invalid_challenge", "consent challenge required")
+		return
+	}
+	data, err := h.cache.Get(r.Context(), "consent:"+challengeID)
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_challenge", "consent challenge expired or invalid")
+		return
+	}
+	var challenge consentChallenge
+	if err := json.Unmarshal(data, &challenge); err != nil {
+		Error(w, http.StatusInternalServerError, "internal", "failed to unmarshal challenge")
+		return
+	}
+	userID, err := mw.GetUserID(r.Context())
+	if err != nil || challenge.UserID != userID.String() {
+		Error(w, http.StatusForbidden, "forbidden", "consent challenge does not belong to current user")
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{
+		"client": map[string]any{
+			"client_id":     challenge.ClientID,
+			"name":          challenge.ClientName,
+			"description":   challenge.ClientDescription,
+			"logo_url":      challenge.ClientLogoURL,
+			"homepage_url":  challenge.WebsiteURL,
+			"redirect_uri":  challenge.RedirectURI,
+		},
+		"developer": map[string]any{
+			"id": challenge.DeveloperID,
+		},
+		"scopes": challenge.Scopes,
+	})
+}
+
 // ConsentAccept handles POST /api/v1/consent/accept.
 // Stores consent and returns a redirect URI if a challenge was provided.
 func (h *OIDCHandler) ConsentAccept(w http.ResponseWriter, r *http.Request) {
@@ -246,6 +340,10 @@ func (h *OIDCHandler) ConsentAccept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.cache.Delete(r.Context(), "consent:"+req.ConsentChallenge)
+	if err := h.cache.Set(r.Context(), "consent_accepted:"+req.ConsentChallenge, data, 5*time.Minute); err != nil {
+		Error(w, http.StatusInternalServerError, "internal", "failed to accept challenge")
+		return
+	}
 
 	var challenge consentChallenge
 	if err := json.Unmarshal(data, &challenge); err != nil {
@@ -254,9 +352,17 @@ func (h *OIDCHandler) ConsentAccept(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect back to the authorize endpoint to complete the flow.
+	resumeURL, err := url.Parse(challenge.RequestURL)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "internal", "failed to parse challenge request")
+		return
+	}
+	q := resumeURL.Query()
+	q.Set("consent_challenge", req.ConsentChallenge)
+	resumeURL.RawQuery = q.Encode()
 	JSON(w, http.StatusOK, map[string]any{
 		"accepted":     true,
-		"redirect_uri": challenge.RequestURL,
+		"redirect_uri": resumeURL.String(),
 	})
 }
 
@@ -275,7 +381,7 @@ func (h *OIDCHandler) ConsentReject(w http.ResponseWriter, r *http.Request) {
 			if json.Unmarshal(data, &challenge) == nil {
 				JSON(w, http.StatusOK, map[string]any{
 					"rejected":     true,
-					"redirect_uri": challenge.RedirectURI + "?error=access_denied&error_description=user+denied+consent",
+					"redirect_uri": buildConsentRejectRedirect(challenge),
 				})
 				return
 			}
@@ -303,3 +409,48 @@ func generateRandomToken(length int) (string, error) {
 	return service.GenerateRandomTokenExported(length)
 }
 
+func consentChallengeMatches(challenge consentChallenge, userID, clientID, redirectURI string, scopes []string) bool {
+	if challenge.UserID != userID || challenge.ClientID != clientID || challenge.RedirectURI != redirectURI {
+		return false
+	}
+	if len(challenge.Scopes) != len(scopes) {
+		return false
+	}
+	seen := make(map[string]int, len(challenge.Scopes))
+	for _, scope := range challenge.Scopes {
+		seen[scope]++
+	}
+	for _, scope := range scopes {
+		if seen[scope] == 0 {
+			return false
+		}
+		seen[scope]--
+	}
+	return true
+}
+
+func buildConsentRejectRedirect(challenge consentChallenge) string {
+	redirectURL, err := url.Parse(challenge.RedirectURI)
+	if err != nil {
+		return challenge.RedirectURI
+	}
+	q := redirectURL.Query()
+	q.Set("error", "access_denied")
+	q.Set("error_description", "user denied consent")
+	if requestURL, err := url.Parse(challenge.RequestURL); err == nil {
+		if state := requestURL.Query().Get("state"); state != "" {
+			q.Set("state", state)
+		}
+	}
+	redirectURL.RawQuery = q.Encode()
+	return redirectURL.String()
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}

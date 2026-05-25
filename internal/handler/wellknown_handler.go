@@ -30,11 +30,11 @@ func (h *WellKnownHandler) Discovery(w http.ResponseWriter, r *http.Request) {
 		"jwks_uri":                              h.baseURL + "/jwks.json",
 		"revocation_endpoint":                   h.baseURL + "/oauth2/revoke",
 		"introspection_endpoint":                h.baseURL + "/oauth2/introspect",
-		"response_types_supported":              []string{"code", "id_token", "code id_token", "token", "token id_token", "code token id_token"},
+		"response_types_supported":              []string{"code"},
 		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "client_credentials"},
 		"subject_types_supported":               []string{"public"},
 		"id_token_signing_alg_values_supported": []string{"RS256"},
-		"scopes_supported":                      []string{"openid", "profile", "email", "offline_access"},
+		"scopes_supported":                      []string{"openid", "profile", "email", "security_level", "offline_access"},
 		"token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post", "none"},
 		"claims_supported": []string{
 			"sub", "iss", "aud", "exp", "iat",

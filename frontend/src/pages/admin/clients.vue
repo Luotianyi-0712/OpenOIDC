@@ -48,7 +48,7 @@ const form = ref({
   is_active: true,
 })
 
-const allGrantTypes = ['authorization_code', 'refresh_token', 'client_credentials', 'implicit', 'device_code']
+const allGrantTypes = ['authorization_code', 'refresh_token', 'client_credentials']
 
 const showSecretModal = ref(false)
 const revealedSecret = ref('')

@@ -51,6 +51,7 @@ type devCreateAppRequest struct {
 	ClientName       string   `json:"client_name"`
 	Description      string   `json:"description"`
 	LogoURL          string   `json:"logo_url"`
+	HomepageURL      string   `json:"homepage_url"`
 	RedirectURIs     []string `json:"redirect_uris"`
 	Scopes           []string `json:"scopes"`
 	GrantTypes       []string `json:"grant_types"`
@@ -83,6 +84,7 @@ func (h *DeveloperHandler) CreateApp(w http.ResponseWriter, r *http.Request) {
 		ClientName:       req.ClientName,
 		Description:      req.Description,
 		LogoURL:          req.LogoURL,
+		HomepageURL:      req.HomepageURL,
 		OwnerUserID:      &userID,
 		RedirectURIs:     req.RedirectURIs,
 		GrantTypes:       grantTypes,
@@ -148,6 +150,7 @@ type devUpdateAppRequest struct {
 	ClientName       *string  `json:"client_name"`
 	Description      *string  `json:"description"`
 	LogoURL          *string  `json:"logo_url"`
+	HomepageURL      *string  `json:"homepage_url"`
 	RedirectURIs     []string `json:"redirect_uris"`
 	Scopes           []string `json:"scopes"`
 	GrantTypes       []string `json:"grant_types"`
@@ -190,6 +193,9 @@ func (h *DeveloperHandler) UpdateApp(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.LogoURL != nil {
 		client.LogoURL = *req.LogoURL
+	}
+	if req.HomepageURL != nil {
+		client.HomepageURL = *req.HomepageURL
 	}
 	if req.RedirectURIs != nil {
 		client.RedirectURIs = req.RedirectURIs
@@ -358,6 +364,7 @@ func devClientPayload(c *domain.OIDCClient) map[string]any {
 		"client_name":                 c.ClientName,
 		"description":                 c.Description,
 		"logo_url":                    c.LogoURL,
+		"homepage_url":                c.HomepageURL,
 		"owner_user_id":               c.OwnerUserID,
 		"redirect_uris":               c.RedirectURIs,
 		"grant_types":                 c.GrantTypes,

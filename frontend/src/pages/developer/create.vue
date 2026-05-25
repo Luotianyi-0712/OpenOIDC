@@ -12,6 +12,7 @@ const form = ref({
   client_name: '',
   description: '',
   logo_url: '',
+  homepage_url: '',
   redirect_uris: '',
   scopes: ['openid'] as string[],
   grant_types: ['authorization_code', 'refresh_token'] as string[],
@@ -19,7 +20,7 @@ const form = ref({
 })
 
 const allScopes = ['openid', 'profile', 'email', 'security_level']
-const allGrantTypes = ['authorization_code', 'refresh_token', 'client_credentials', 'implicit', 'device_code']
+const allGrantTypes = ['authorization_code', 'refresh_token', 'client_credentials']
 
 const saving = ref(false)
 const error = ref('')
@@ -50,6 +51,7 @@ async function submit() {
       client_name: form.value.client_name,
       description: form.value.description,
       logo_url: form.value.logo_url || undefined,
+      homepage_url: form.value.homepage_url || undefined,
       redirect_uris: form.value.redirect_uris.split('\n').map(s => s.trim()).filter(Boolean),
       scopes: form.value.scopes,
       grant_types: form.value.grant_types,
@@ -140,6 +142,18 @@ function closeSecretModal() {
         <div v-if="form.logo_url" class="mt-2">
           <img :src="form.logo_url" alt="Logo preview" class="w-12 h-12 rounded-lg object-cover border border-border" />
         </div>
+      </div>
+
+      <!-- Website URL -->
+      <div>
+        <label class="block text-sm font-medium mb-1.5">{{ $t('developer.homepageUrl') }}</label>
+        <input
+          v-model="form.homepage_url"
+          type="url"
+          placeholder="https://example.com"
+          class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10"
+        />
+        <p class="text-xs text-muted-foreground mt-1">{{ $t('developer.homepageUrlHint') }}</p>
       </div>
 
       <!-- Redirect URIs -->

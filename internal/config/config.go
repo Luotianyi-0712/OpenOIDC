@@ -9,24 +9,25 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Redis    RedisConfig
-	JWT      JWTConfig
-	Session  SessionConfig
-	Admin    AdminConfig
-	Log      LogConfig
-	Security SecurityConfig
-	OAuth2   OAuth2Config
-	SMS      SMSConfig
-	SMTP     SMTPConfig
+	Server         ServerConfig
+	Database       DatabaseConfig
+	Redis          RedisConfig
+	JWT            JWTConfig
+	Session        SessionConfig
+	Admin          AdminConfig
+	Log            LogConfig
+	Security       SecurityConfig
+	OAuth2         OAuth2Config
+	SocialAuthSync SocialAuthSyncConfig `mapstructure:"social_auth_sync"`
+	SMS            SMSConfig
+	SMTP           SMTPConfig
 }
 
 type ServerConfig struct {
 	Host            string
 	Port            int
 	Issuer          string
-	BaseURL         string `mapstructure:"public_url"`
+	BaseURL         string        `mapstructure:"public_url"`
 	ReadTimeout     time.Duration `mapstructure:"read_timeout"`
 	WriteTimeout    time.Duration `mapstructure:"write_timeout"`
 	ShutdownTimeout time.Duration `mapstructure:"shutdown_timeout"`
@@ -39,10 +40,10 @@ type DatabaseConfig struct {
 	Port            int
 	User            string
 	Password        string
-	DBName          string `mapstructure:"name"`
-	SSLMode         string `mapstructure:"sslmode"`
-	MaxOpenConns    int    `mapstructure:"max_conns"`
-	MaxIdleConns    int    `mapstructure:"min_conns"`
+	DBName          string        `mapstructure:"name"`
+	SSLMode         string        `mapstructure:"sslmode"`
+	MaxOpenConns    int           `mapstructure:"max_conns"`
+	MaxIdleConns    int           `mapstructure:"min_conns"`
 	MaxConnLifetime time.Duration `mapstructure:"max_conn_lifetime"`
 	MaxConnIdleTime time.Duration `mapstructure:"max_conn_idle_time"`
 }
@@ -85,18 +86,24 @@ type LogConfig struct {
 }
 
 type SecurityConfig struct {
-	PasswordMinLength    int           `mapstructure:"password_min_length"`
-	PasswordRequireUpper bool          `mapstructure:"password_require_upper"`
-	PasswordRequireLower bool          `mapstructure:"password_require_lower"`
-	PasswordRequireDigit bool          `mapstructure:"password_require_digit"`
-	PasswordRequireSymbol bool         `mapstructure:"password_require_symbol"`
-	MaxLoginAttempts     int           `mapstructure:"max_login_attempts"`
-	LockoutDuration      time.Duration `mapstructure:"lockout_duration"`
-	BcryptCost           int           `mapstructure:"bcrypt_cost"`
+	PasswordMinLength     int           `mapstructure:"password_min_length"`
+	PasswordRequireUpper  bool          `mapstructure:"password_require_upper"`
+	PasswordRequireLower  bool          `mapstructure:"password_require_lower"`
+	PasswordRequireDigit  bool          `mapstructure:"password_require_digit"`
+	PasswordRequireSymbol bool          `mapstructure:"password_require_symbol"`
+	MaxLoginAttempts      int           `mapstructure:"max_login_attempts"`
+	LockoutDuration       time.Duration `mapstructure:"lockout_duration"`
+	BcryptCost            int           `mapstructure:"bcrypt_cost"`
 }
 
 type OAuth2Config struct {
 	Providers map[string]ProviderOAuth2Config `mapstructure:",remain"`
+}
+
+type SocialAuthSyncConfig struct {
+	Enabled   bool          `mapstructure:"enabled"`
+	Interval  time.Duration `mapstructure:"interval"`
+	BatchSize int           `mapstructure:"batch_size"`
 }
 
 type ProviderOAuth2Config struct {
@@ -200,4 +207,7 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "json")
+	v.SetDefault("social_auth_sync.enabled", true)
+	v.SetDefault("social_auth_sync.interval", "1h")
+	v.SetDefault("social_auth_sync.batch_size", 100)
 }

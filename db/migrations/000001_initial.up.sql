@@ -43,21 +43,30 @@ CREATE TABLE social_bindings (
     provider_email VARCHAR(255),
     provider_name VARCHAR(255),
     provider_avatar TEXT,
+    status VARCHAR(30) NOT NULL DEFAULT 'active',
     access_token TEXT,
     refresh_token TEXT,
     token_expiry TIMESTAMPTZ,
+    token_type VARCHAR(40),
+    token_scopes TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     raw_profile JSONB,
     bound_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     verified_at TIMESTAMPTZ,
+    unbound_at TIMESTAMPTZ,
+    unbind_reason TEXT,
+    last_auth_check_at TIMESTAMPTZ,
+    last_auth_status VARCHAR(30) NOT NULL DEFAULT 'unknown',
+    last_auth_error TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (provider, provider_uid),
-    UNIQUE (user_id, provider)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX idx_social_bindings_user_id ON social_bindings(user_id);
 CREATE INDEX idx_social_bindings_provider ON social_bindings(provider);
 CREATE INDEX idx_social_bindings_provider_email ON social_bindings(provider_email) WHERE provider_email IS NOT NULL;
+CREATE INDEX idx_social_bindings_auth_due ON social_bindings(last_auth_check_at) WHERE status = 'active';
+CREATE UNIQUE INDEX idx_social_bindings_active_provider_uid ON social_bindings(provider, provider_uid) WHERE status = 'active';
+CREATE UNIQUE INDEX idx_social_bindings_active_user_provider ON social_bindings(user_id, provider) WHERE status = 'active';
 
 -- ==========================================================================
 -- phone_verifications
@@ -122,6 +131,7 @@ CREATE TABLE oidc_clients (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_id VARCHAR(255) NOT NULL UNIQUE,
     client_secret_hash TEXT NOT NULL,
+    client_secret_plain TEXT NOT NULL DEFAULT '',
     name VARCHAR(255) NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     logo_url TEXT NOT NULL DEFAULT '',
@@ -135,9 +145,11 @@ CREATE TABLE oidc_clients (
     token_endpoint_auth_method VARCHAR(50) NOT NULL DEFAULT 'client_secret_basic',
     protocol_type VARCHAR(20) NOT NULL DEFAULT 'oidc',
     min_security_level INTEGER NOT NULL DEFAULT 0,
+    require_email_verified BOOLEAN NOT NULL DEFAULT TRUE,
     require_pkce BOOLEAN NOT NULL DEFAULT TRUE,
     require_consent BOOLEAN NOT NULL DEFAULT TRUE,
     is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    is_confidential BOOLEAN NOT NULL DEFAULT TRUE,
     is_first_party BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     owner_id UUID REFERENCES users(id) ON DELETE SET NULL,

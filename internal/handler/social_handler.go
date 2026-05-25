@@ -197,6 +197,12 @@ func errorCode(err error) string {
 		return "account_deleted"
 	case errors.Is(err, service.ErrRegistrationDisabled):
 		return "registration_disabled"
+	case errors.Is(err, service.ErrSocialLoginDisabled):
+		return "social_login_disabled"
+	case errors.Is(err, service.ErrSocialRegistrationDisabled):
+		return "social_registration_disabled"
+	case errors.Is(err, service.ErrSocialBindingDisabled):
+		return "social_binding_disabled"
 	case errors.Is(err, service.ErrInvalidToken):
 		return "invalid_state"
 	default:

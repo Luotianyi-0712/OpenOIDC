@@ -82,8 +82,8 @@ func (p *PhoneProvider) CompleteAuth(ctx context.Context, r *http.Request) (*por
 
 func (p *PhoneProvider) SupportsRefresh() bool { return false }
 
-func (p *PhoneProvider) RefreshToken(_ context.Context, _ string) (string, string, error) {
-	return "", "", fmt.Errorf("phone provider does not support refresh")
+func (p *PhoneProvider) RefreshToken(_ context.Context, _ string) (*port.ProviderTokenInfo, error) {
+	return nil, fmt.Errorf("phone provider does not support refresh")
 }
 
 var _ port.SocialProvider = (*PhoneProvider)(nil)

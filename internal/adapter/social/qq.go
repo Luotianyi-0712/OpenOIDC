@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/anthropic/oidc-platform/internal/domain"
 	"github.com/anthropic/oidc-platform/internal/port"
@@ -42,12 +44,12 @@ func (p *QQProvider) BeginAuth(_ context.Context, state, redirectURL string) (st
 }
 
 type qqUserInfo struct {
-	Ret           int    `json:"ret"`
-	Msg           string `json:"msg"`
-	Nickname      string `json:"nickname"`
-	FigureURLQQ2  string `json:"figureurl_qq_2"`
-	FigureURLQQ1  string `json:"figureurl_qq_1"`
-	FigureURLQQ   string `json:"figureurl_qq"`
+	Ret          int    `json:"ret"`
+	Msg          string `json:"msg"`
+	Nickname     string `json:"nickname"`
+	FigureURLQQ2 string `json:"figureurl_qq_2"`
+	FigureURLQQ1 string `json:"figureurl_qq_1"`
+	FigureURLQQ  string `json:"figureurl_qq"`
 }
 
 func (p *QQProvider) CompleteAuth(ctx context.Context, r *http.Request) (*port.ProviderUserInfo, error) {
@@ -60,17 +62,17 @@ func (p *QQProvider) CompleteAuth(ctx context.Context, r *http.Request) (*port.P
 	}
 	redirectURL := redirectFromRequest(r)
 
-	accessToken, _, err := p.exchangeCode(ctx, code, redirectURL)
+	token, err := p.exchangeCode(ctx, code, redirectURL)
 	if err != nil {
 		return nil, err
 	}
 
-	openID, err := p.fetchOpenID(ctx, accessToken)
+	openID, err := p.fetchOpenID(ctx, token.AccessToken)
 	if err != nil {
 		return nil, err
 	}
 
-	info, err := p.fetchUserInfo(ctx, accessToken, openID)
+	info, err := p.fetchUserInfo(ctx, token.AccessToken, openID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +86,8 @@ func (p *QQProvider) CompleteAuth(ctx context.Context, r *http.Request) (*port.P
 	}
 
 	raw := map[string]any{
-		"openid":   openID,
-		"nickname": info.Nickname,
+		"openid":         openID,
+		"nickname":       info.Nickname,
 		"figureurl_qq_2": info.FigureURLQQ2,
 	}
 
@@ -94,14 +96,15 @@ func (p *QQProvider) CompleteAuth(ctx context.Context, r *http.Request) (*port.P
 		DisplayName: info.Nickname,
 		AvatarURL:   avatar,
 		RawProfile:  raw,
+		Token:       token,
 	}, nil
 }
 
 func (p *QQProvider) SupportsRefresh() bool { return true }
 
-func (p *QQProvider) RefreshToken(ctx context.Context, refreshToken string) (string, string, error) {
+func (p *QQProvider) RefreshToken(ctx context.Context, refreshToken string) (*port.ProviderTokenInfo, error) {
 	if refreshToken == "" {
-		return "", "", fmt.Errorf("empty refresh token")
+		return nil, fmt.Errorf("empty refresh token")
 	}
 	params := url.Values{}
 	params.Set("grant_type", "refresh_token")
@@ -111,21 +114,49 @@ func (p *QQProvider) RefreshToken(ctx context.Context, refreshToken string) (str
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, qqTokenURL+"?"+params.Encode(), nil)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	return parseQQTokenResponse(string(body))
 }
 
-func (p *QQProvider) exchangeCode(ctx context.Context, code, redirectURL string) (string, string, error) {
+func (p *QQProvider) ValidateToken(ctx context.Context, accessToken string) (*port.ProviderUserInfo, error) {
+	openID, err := p.fetchOpenID(ctx, accessToken)
+	if err != nil {
+		return nil, err
+	}
+	info, err := p.fetchUserInfo(ctx, accessToken, openID)
+	if err != nil {
+		return nil, err
+	}
+	avatar := info.FigureURLQQ2
+	if avatar == "" {
+		avatar = info.FigureURLQQ1
+	}
+	if avatar == "" {
+		avatar = info.FigureURLQQ
+	}
+	return &port.ProviderUserInfo{
+		ProviderUID: openID,
+		DisplayName: info.Nickname,
+		AvatarURL:   avatar,
+		RawProfile: map[string]any{
+			"openid":         openID,
+			"nickname":       info.Nickname,
+			"figureurl_qq_2": info.FigureURLQQ2,
+		},
+	}, nil
+}
+
+func (p *QQProvider) exchangeCode(ctx context.Context, code, redirectURL string) (*port.ProviderTokenInfo, error) {
 	params := url.Values{}
 	params.Set("grant_type", "authorization_code")
 	params.Set("client_id", p.clientID)
@@ -135,24 +166,26 @@ func (p *QQProvider) exchangeCode(ctx context.Context, code, redirectURL string)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, qqTokenURL+"?"+params.Encode(), nil)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("exchange code: %w", err)
+		return nil, fmt.Errorf("exchange code: %w", err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	return parseQQTokenResponse(string(body))
 }
 
 // parseQQTokenResponse handles the query-string response, e.g.:
-//   access_token=FE04...&expires_in=7776000&refresh_token=88E4...
+//
+//	access_token=FE04...&expires_in=7776000&refresh_token=88E4...
+//
 // On error the body may also be JSON: {"error":1,"error_description":"..."}
-func parseQQTokenResponse(body string) (string, string, error) {
+func parseQQTokenResponse(body string) (*port.ProviderTokenInfo, error) {
 	body = strings.TrimSpace(body)
 	if strings.HasPrefix(body, "{") {
 		var errResp struct {
@@ -160,18 +193,29 @@ func parseQQTokenResponse(body string) (string, string, error) {
 			ErrorDescription string          `json:"error_description"`
 		}
 		if err := json.Unmarshal([]byte(body), &errResp); err == nil && len(errResp.Error) > 0 {
-			return "", "", fmt.Errorf("qq token error: %s: %s", string(errResp.Error), errResp.ErrorDescription)
+			return nil, fmt.Errorf("qq token error: %s: %s", string(errResp.Error), errResp.ErrorDescription)
 		}
 	}
 	values, err := url.ParseQuery(body)
 	if err != nil {
-		return "", "", fmt.Errorf("parse qq token response: %w", err)
+		return nil, fmt.Errorf("parse qq token response: %w", err)
 	}
 	at := values.Get("access_token")
 	if at == "" {
-		return "", "", fmt.Errorf("qq response missing access_token: %s", body)
+		return nil, fmt.Errorf("qq response missing access_token: %s", body)
 	}
-	return at, values.Get("refresh_token"), nil
+	var expiry *time.Time
+	if expiresIn, err := strconv.Atoi(values.Get("expires_in")); err == nil && expiresIn > 0 {
+		exp := time.Now().UTC().Add(time.Duration(expiresIn) * time.Second)
+		expiry = &exp
+	}
+	return &port.ProviderTokenInfo{
+		AccessToken:  at,
+		RefreshToken: values.Get("refresh_token"),
+		Expiry:       expiry,
+		TokenType:    "Bearer",
+		Scopes:       []string{"get_user_info"},
+	}, nil
 }
 
 func (p *QQProvider) fetchOpenID(ctx context.Context, accessToken string) (string, error) {

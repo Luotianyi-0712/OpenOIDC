@@ -235,16 +235,18 @@ func (h *AdminHandler) ResetUserPassword(w http.ResponseWriter, r *http.Request)
 // ---------------- Clients ----------------
 
 type createClientRequest struct {
-	ClientName       string     `json:"client_name"`
-	Description      string     `json:"description"`
-	LogoURL          string     `json:"logo_url"`
-	OwnerUserID      *uuid.UUID `json:"owner_user_id"`
-	RedirectURIs     []string   `json:"redirect_uris"`
-	GrantTypes       []string   `json:"grant_types"`
-	Scopes           []string   `json:"scopes"`
-	MinSecurityLevel int        `json:"min_security_level"`
-	ProtocolType     string     `json:"protocol_type"`
-	IsConfidential   bool       `json:"is_confidential"`
+	ClientName           string     `json:"client_name"`
+	Description          string     `json:"description"`
+	LogoURL              string     `json:"logo_url"`
+	HomepageURL          string     `json:"homepage_url"`
+	OwnerUserID          *uuid.UUID `json:"owner_user_id"`
+	RedirectURIs         []string   `json:"redirect_uris"`
+	GrantTypes           []string   `json:"grant_types"`
+	Scopes               []string   `json:"scopes"`
+	MinSecurityLevel     int        `json:"min_security_level"`
+	RequireEmailVerified *bool      `json:"require_email_verified"`
+	ProtocolType         string     `json:"protocol_type"`
+	IsConfidential       bool       `json:"is_confidential"`
 }
 
 func (h *AdminHandler) ListClients(w http.ResponseWriter, r *http.Request) {
@@ -292,16 +294,18 @@ func (h *AdminHandler) CreateClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input := service.CreateClientInput{
-		ClientName:       req.ClientName,
-		Description:      req.Description,
-		LogoURL:          req.LogoURL,
-		OwnerUserID:      req.OwnerUserID,
-		RedirectURIs:     req.RedirectURIs,
-		GrantTypes:       req.GrantTypes,
-		Scopes:           req.Scopes,
-		MinSecurityLevel: req.MinSecurityLevel,
-		ProtocolType:     req.ProtocolType,
-		IsConfidential:   req.IsConfidential,
+		ClientName:           req.ClientName,
+		Description:          req.Description,
+		LogoURL:              req.LogoURL,
+		HomepageURL:          req.HomepageURL,
+		OwnerUserID:          req.OwnerUserID,
+		RedirectURIs:         req.RedirectURIs,
+		GrantTypes:           req.GrantTypes,
+		Scopes:               req.Scopes,
+		MinSecurityLevel:     req.MinSecurityLevel,
+		RequireEmailVerified: req.RequireEmailVerified,
+		ProtocolType:         req.ProtocolType,
+		IsConfidential:       req.IsConfidential,
 	}
 	client, secret, err := h.clientSvc.CreateClient(r.Context(), input)
 	if err != nil {
@@ -328,14 +332,16 @@ func (h *AdminHandler) GetClient(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateClientRequest struct {
-	ClientName       *string  `json:"client_name"`
-	Description      *string  `json:"description"`
-	LogoURL          *string  `json:"logo_url"`
-	RedirectURIs     []string `json:"redirect_uris"`
-	GrantTypes       []string `json:"grant_types"`
-	Scopes           []string `json:"scopes"`
-	MinSecurityLevel *int     `json:"min_security_level"`
-	IsActive         *bool    `json:"is_active"`
+	ClientName           *string  `json:"client_name"`
+	Description          *string  `json:"description"`
+	LogoURL              *string  `json:"logo_url"`
+	HomepageURL          *string  `json:"homepage_url"`
+	RedirectURIs         []string `json:"redirect_uris"`
+	GrantTypes           []string `json:"grant_types"`
+	Scopes               []string `json:"scopes"`
+	MinSecurityLevel     *int     `json:"min_security_level"`
+	RequireEmailVerified *bool    `json:"require_email_verified"`
+	IsActive             *bool    `json:"is_active"`
 }
 
 func (h *AdminHandler) UpdateClient(w http.ResponseWriter, r *http.Request) {
@@ -363,6 +369,9 @@ func (h *AdminHandler) UpdateClient(w http.ResponseWriter, r *http.Request) {
 	if req.LogoURL != nil {
 		client.LogoURL = *req.LogoURL
 	}
+	if req.HomepageURL != nil {
+		client.HomepageURL = *req.HomepageURL
+	}
 	if req.RedirectURIs != nil {
 		client.RedirectURIs = req.RedirectURIs
 	}
@@ -374,6 +383,9 @@ func (h *AdminHandler) UpdateClient(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.MinSecurityLevel != nil {
 		client.MinSecurityLevel = *req.MinSecurityLevel
+	}
+	if req.RequireEmailVerified != nil {
+		client.RequireEmailVerified = *req.RequireEmailVerified
 	}
 	if req.IsActive != nil {
 		client.IsActive = *req.IsActive
@@ -1132,25 +1144,25 @@ func (h *AdminHandler) auditPayload(ctx context.Context, log *domain.AuditLog) m
 
 func (h *AdminHandler) clientPayload(ctx context.Context, c *domain.OIDCClient) map[string]any {
 	payload := map[string]any{
-		"id":                          c.ID,
-		"client_id":                   c.ClientID,
-		"client_secret":               c.ClientSecretPlain,
-		"client_name":                 c.ClientName,
-		"description":                 c.Description,
-		"logo_url":                    c.LogoURL,
-		"owner_user_id":               c.OwnerUserID,
-		"redirect_uris":               c.RedirectURIs,
-		"grant_types":                 c.GrantTypes,
-		"response_types":              c.ResponseTypes,
-		"scopes":                      c.Scopes,
-		"token_endpoint_auth_method":  c.TokenEndpointAuthMethod,
-		"min_security_level":          c.MinSecurityLevel,
-		"require_email_verified":      c.RequireEmailVerified,
-		"protocol_type":               c.ProtocolType,
-		"is_active":                   c.IsActive,
-		"is_confidential":             c.IsConfidential,
-		"created_at":                  c.CreatedAt,
-		"updated_at":                  c.UpdatedAt,
+		"id":                         c.ID,
+		"client_id":                  c.ClientID,
+		"client_secret":              c.ClientSecretPlain,
+		"client_name":                c.ClientName,
+		"description":                c.Description,
+		"logo_url":                   c.LogoURL,
+		"owner_user_id":              c.OwnerUserID,
+		"redirect_uris":              c.RedirectURIs,
+		"grant_types":                c.GrantTypes,
+		"response_types":             c.ResponseTypes,
+		"scopes":                     c.Scopes,
+		"token_endpoint_auth_method": c.TokenEndpointAuthMethod,
+		"min_security_level":         c.MinSecurityLevel,
+		"require_email_verified":     c.RequireEmailVerified,
+		"protocol_type":              c.ProtocolType,
+		"is_active":                  c.IsActive,
+		"is_confidential":            c.IsConfidential,
+		"created_at":                 c.CreatedAt,
+		"updated_at":                 c.UpdatedAt,
 	}
 	if c.OwnerUserID != nil {
 		if owner, err := h.userRepo.GetByID(ctx, *c.OwnerUserID); err == nil {

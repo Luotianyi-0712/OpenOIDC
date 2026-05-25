@@ -93,8 +93,8 @@ func (p *TelegramProvider) CompleteAuth(_ context.Context, r *http.Request) (*po
 
 func (p *TelegramProvider) SupportsRefresh() bool { return false }
 
-func (p *TelegramProvider) RefreshToken(_ context.Context, _ string) (string, string, error) {
-	return "", "", fmt.Errorf("telegram does not support token refresh")
+func (p *TelegramProvider) RefreshToken(_ context.Context, _ string) (*port.ProviderTokenInfo, error) {
+	return nil, fmt.Errorf("telegram does not support token refresh")
 }
 
 func (p *TelegramProvider) verifyHash(values map[string]string, hashGiven string) bool {
