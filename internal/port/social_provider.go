@@ -37,11 +37,13 @@ type TokenValidatingProvider interface {
 }
 
 type EnabledSocialProvider struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
-	Type        string `json:"type,omitempty"`
-	IconURL     string `json:"icon_url,omitempty"`
-	SortOrder   int    `json:"-"`
+	Name            string `json:"name"`
+	DisplayName     string `json:"display_name"`
+	Type            string `json:"type,omitempty"`
+	IconURL         string `json:"icon_url,omitempty"`
+	LoginEnabled    bool   `json:"login_enabled"`
+	RegisterEnabled bool   `json:"register_enabled"`
+	SortOrder       int    `json:"-"`
 }
 
 type SocialProviderRegistry interface {
@@ -49,6 +51,8 @@ type SocialProviderRegistry interface {
 	List() []string
 	ListPublic() []EnabledSocialProvider
 	IsEnabled(name string) bool
+	IsLoginEnabled(name string) bool
+	IsRegisterEnabled(name string) bool
 	Register(p SocialProvider)
 	Reload(ctx context.Context) error
 }

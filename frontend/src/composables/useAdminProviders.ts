@@ -7,6 +7,8 @@ export interface Provider {
   provider: string
   display_name: string
   enabled: boolean
+  login_enabled: boolean
+  register_enabled: boolean
   type?: string
   client_id?: string
   has_secret: boolean
@@ -49,6 +51,8 @@ export type ProviderFormKey =
   | 'provider'
   | 'display_name'
   | 'enabled'
+  | 'login_enabled'
+  | 'register_enabled'
   | 'client_id'
   | 'client_secret'
   | 'app_id'
@@ -218,6 +222,8 @@ const emptyForm = (): ProviderForm => ({
   provider: '',
   display_name: '',
   enabled: false,
+  login_enabled: true,
+  register_enabled: true,
   client_id: '',
   client_secret: '',
   app_id: '',
@@ -281,6 +287,8 @@ function splitScopes(value: string): string[] {
 function fillFormFromProvider(form: ProviderForm, provider: Provider) {
   const next = emptyForm()
   next.enabled = provider.enabled
+  next.login_enabled = provider.login_enabled !== false
+  next.register_enabled = provider.register_enabled !== false
   next.display_name = provider.display_name || providerDisplayName(provider)
   next.client_id = provider.client_id ?? ''
   next.app_id = provider.app_id ?? ''
@@ -307,7 +315,11 @@ function addString(payload: Record<string, unknown>, key: ProviderFormKey, value
 }
 
 function providerPayload(form: ProviderForm, fields: FieldDef[], includeCustomOAuth2: boolean): Record<string, unknown> {
-  const payload: Record<string, unknown> = { enabled: Boolean(form.enabled) }
+  const payload: Record<string, unknown> = {
+    enabled: Boolean(form.enabled),
+    login_enabled: Boolean(form.login_enabled),
+    register_enabled: Boolean(form.register_enabled),
+  }
 
   addString(payload, 'display_name', form.display_name)
   for (const field of fields) addString(payload, field.key, form[field.key])

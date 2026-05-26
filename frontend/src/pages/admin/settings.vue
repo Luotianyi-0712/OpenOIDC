@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { api } from '@/api/client'
-import { Pencil, Loader2, X, Mail, Save } from 'lucide-vue-next'
+import { Pencil, Loader2, X, Mail, Save, Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { usePublicConfig } from '@/composables/usePublicConfig'
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const { settings: publicSettings, loaded: publicConfigLoaded } = usePublicConfig()
 
 interface Setting {
   key: string
@@ -76,10 +78,12 @@ const siteSaving = ref(false)
 
 // SMTP form
 const smtpForm = ref({ host: '', port: '465', username: '', password: '', from: '' })
+const showSmtpPassword = ref(false)
 const smtpSaving = ref(false)
 
 // Turnstile
 const turnstileForm = ref({ siteKey: '', secretKey: '' })
+const showTurnstileSecret = ref(false)
 const turnstileSaving = ref(false)
 
 // Email domain whitelist
@@ -321,6 +325,15 @@ async function deleteAlias(id: string) {
     </div>
 
     <template v-else>
+      <div class="border border-border rounded-xl p-6 mb-8 bg-muted/20">
+        <h3 class="text-base font-semibold mb-2">{{ $t('adminSettings.versionTitle') }}</h3>
+        <p class="text-sm text-muted-foreground mb-4">{{ $t('adminSettings.versionDesc') }}</p>
+        <div class="flex items-center justify-between rounded-lg border border-border bg-white px-4 py-3">
+          <span class="text-sm text-muted-foreground">{{ $t('adminSettings.currentVersion') }}</span>
+          <code class="text-sm font-mono font-semibold">{{ publicConfigLoaded ? publicSettings.version : '1.0.0' }}</code>
+        </div>
+      </div>
+
       <!-- Site URL -->
       <div class="border border-border rounded-xl p-6 mb-8">
         <h3 class="text-base font-semibold mb-2">{{ $t('adminSettings.siteTitle') }}</h3>
@@ -402,7 +415,17 @@ async function deleteAlias(id: string) {
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.smtpPassword') }}</label>
-            <input v-model="smtpForm.password" type="password" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+            <div class="relative">
+              <input v-model="smtpForm.password" :type="showSmtpPassword ? 'text' : 'password'" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+              <button
+                type="button"
+                @click="showSmtpPassword = !showSmtpPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <EyeOff v-if="showSmtpPassword" class="w-4 h-4" />
+                <Eye v-else class="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div class="md:col-span-2">
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.smtpFrom') }}</label>
@@ -430,7 +453,17 @@ async function deleteAlias(id: string) {
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.turnstileSecretKey') }}</label>
-            <input v-model="turnstileForm.secretKey" type="password" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+            <div class="relative">
+              <input v-model="turnstileForm.secretKey" :type="showTurnstileSecret ? 'text' : 'password'" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+              <button
+                type="button"
+                @click="showTurnstileSecret = !showTurnstileSecret"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <EyeOff v-if="showTurnstileSecret" class="w-4 h-4" />
+                <Eye v-else class="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div class="md:col-span-2 flex justify-end">
             <button type="submit" :disabled="turnstileSaving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">

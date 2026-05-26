@@ -148,6 +148,23 @@ func (r *RiskListRepo) Add(ctx context.Context, entry *domain.RiskListEntry) err
 	return err
 }
 
+func (r *RiskListRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.RiskListEntry, error) {
+	row := r.db.QueryRow(ctx,
+		`SELECT id, provider, provider_uid, user_id, reason, report_id, added_by, created_at
+			 FROM risk_list WHERE id = $1`, id)
+
+	var entry domain.RiskListEntry
+	err := row.Scan(&entry.ID, &entry.Provider, &entry.ProviderUID,
+		&entry.UserID, &entry.Reason, &entry.ReportID, &entry.AddedBy, &entry.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, port.ErrNotFound
+		}
+		return nil, err
+	}
+	return &entry, nil
+}
+
 func (r *RiskListRepo) Check(ctx context.Context, provider, providerUID string) (*domain.RiskListEntry, error) {
 	row := r.db.QueryRow(ctx,
 		`SELECT id, provider, provider_uid, user_id, reason, report_id, added_by, created_at
@@ -189,8 +206,34 @@ func (r *RiskListRepo) List(ctx context.Context, offset, limit int) ([]*domain.R
 	return entries, total, nil
 }
 
+func (r *RiskListRepo) ListByUser(ctx context.Context, userID uuid.UUID) ([]*domain.RiskListEntry, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id, provider, provider_uid, user_id, reason, report_id, added_by, created_at
+			 FROM risk_list WHERE user_id = $1 ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	entries := make([]*domain.RiskListEntry, 0)
+	for rows.Next() {
+		var entry domain.RiskListEntry
+		if err := rows.Scan(&entry.ID, &entry.Provider, &entry.ProviderUID,
+			&entry.UserID, &entry.Reason, &entry.ReportID, &entry.AddedBy, &entry.CreatedAt); err != nil {
+			return nil, err
+		}
+		entries = append(entries, &entry)
+	}
+	return entries, rows.Err()
+}
+
 func (r *RiskListRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM risk_list WHERE id = $1`, id)
+	return err
+}
+
+func (r *RiskListRepo) DeleteByReport(ctx context.Context, reportID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM risk_list WHERE report_id = $1`, reportID)
 	return err
 }
 

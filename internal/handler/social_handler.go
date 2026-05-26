@@ -32,8 +32,10 @@ func (h *SocialHandler) ListEnabled(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(providers))
 	for _, p := range providers {
 		item := map[string]any{
-			"name":         p.Name,
-			"display_name": p.DisplayName,
+			"name":             p.Name,
+			"display_name":     p.DisplayName,
+			"login_enabled":    p.LoginEnabled,
+			"register_enabled": p.RegisterEnabled,
 		}
 		if p.Type != "" {
 			item["type"] = p.Type
@@ -70,7 +72,11 @@ func (h *SocialHandler) Begin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authURL, err := h.socialSvc.BeginSocialLogin(r.Context(), provider, returnTo)
+	intent := r.URL.Query().Get("intent")
+	if intent != "register" {
+		intent = "login"
+	}
+	authURL, err := h.socialSvc.BeginSocialLogin(r.Context(), provider, returnTo, intent)
 	if err != nil {
 		h.redirectError(w, r, returnTo, err)
 		return

@@ -7,6 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/anthropic/oidc-platform/internal/version"
 )
 
 type HealthHandler struct {
@@ -19,7 +21,7 @@ func NewHealthHandler(db *pgxpool.Pool, rdb *redis.Client) *HealthHandler {
 }
 
 func (h *HealthHandler) Healthz(w http.ResponseWriter, r *http.Request) {
-	Raw(w, http.StatusOK, map[string]any{"status": "ok"})
+	Raw(w, http.StatusOK, map[string]any{"status": "ok", "version": version.Version})
 }
 
 func (h *HealthHandler) Readyz(w http.ResponseWriter, r *http.Request) {

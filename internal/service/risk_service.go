@@ -119,24 +119,37 @@ func (s *RiskService) DismissReport(ctx context.Context, reportID, adminID uuid.
 	if err != nil {
 		return fmt.Errorf("get report: %w", err)
 	}
+	wasConfirmed := report.Status == domain.ReportStatusConfirmed
 	now := time.Now().UTC()
 	report.Status = domain.ReportStatusDismissed
 	report.AdminNote = note
 	report.ResolvedAt = &now
 	report.ResolvedBy = &adminID
-	return s.reportRepo.Update(ctx, report)
+	if err := s.reportRepo.Update(ctx, report); err != nil {
+		return err
+	}
+	if wasConfirmed {
+		if err := s.riskListRepo.DeleteByReport(ctx, report.ID); err != nil {
+			return fmt.Errorf("delete report risk entries: %w", err)
+		}
+		return s.restoreUserIfRiskCleared(ctx, report.TargetID)
+	}
+	return nil
 }
 
 // enforceRisk lowers the user's trust level to 0, suspends the account, and adds their social bindings to the risk list.
 func (s *RiskService) enforceRisk(ctx context.Context, userID uuid.UUID, reportID uuid.UUID) error {
-	// Lower trust level to 0.
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("get user: %w", err)
+	}
+	oldLevel := user.SecurityLevel
 	if err := s.userRepo.UpdateSecurityLevel(ctx, userID, 0); err != nil {
 		return fmt.Errorf("downgrade user: %w", err)
 	}
 
-	// Suspend the user account to block password login as well.
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err == nil && user.Status == domain.UserStatusActive {
+	if user.Status == domain.UserStatusActive {
+		user.SecurityLevel = 0
 		user.Status = domain.UserStatusSuspended
 		_ = s.userRepo.Update(ctx, user)
 	}
@@ -144,7 +157,7 @@ func (s *RiskService) enforceRisk(ctx context.Context, userID uuid.UUID, reportI
 	_ = s.auditRepo.CreateSecurityLevelChange(ctx, &domain.SecurityLevelChange{
 		ID:        uuid.New(),
 		UserID:    userID,
-		OldLevel:  -1, // Unknown, just marking as risk enforcement
+		OldLevel:  oldLevel,
 		NewLevel:  0,
 		Reason:    "risk_enforcement",
 		CreatedAt: time.Now().UTC(),
@@ -244,7 +257,54 @@ func (s *RiskService) ListRiskEntries(ctx context.Context, offset, limit int) ([
 
 // RemoveFromRiskList removes a social account from the risk list (admin action).
 func (s *RiskService) RemoveFromRiskList(ctx context.Context, id uuid.UUID) error {
-	return s.riskListRepo.Delete(ctx, id)
+	entry, err := s.riskListRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.riskListRepo.Delete(ctx, id); err != nil {
+		return err
+	}
+	if entry.UserID != nil {
+		return s.restoreUserIfRiskCleared(ctx, *entry.UserID)
+	}
+	return nil
+}
+
+func (s *RiskService) restoreUserIfRiskCleared(ctx context.Context, userID uuid.UUID) error {
+	entries, err := s.riskListRepo.ListByUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("list user risk entries: %w", err)
+	}
+	if len(entries) > 0 {
+		return nil
+	}
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("get user: %w", err)
+	}
+	if user.Status == domain.UserStatusSuspended {
+		user.Status = domain.UserStatusActive
+		if err := s.userRepo.Update(ctx, user); err != nil {
+			return fmt.Errorf("restore user status: %w", err)
+		}
+		rt := "user"
+		rid := userID.String()
+		_ = s.auditRepo.CreateLog(ctx, &domain.AuditLog{
+			ID:           uuid.New(),
+			UserID:       &userID,
+			Action:       "risk.restored",
+			ResourceType: &rt,
+			ResourceID:   &rid,
+			Details:      map[string]any{"reason": "risk_cleared"},
+			CreatedAt:    time.Now().UTC(),
+		})
+	}
+	if s.securitySvc != nil {
+		if _, err := s.securitySvc.ComputeSecurityLevel(ctx, userID); err != nil {
+			return fmt.Errorf("recompute security level: %w", err)
+		}
+	}
+	return nil
 }
 
 // ListPendingReports returns reports waiting for admin review.

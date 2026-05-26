@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { api } from '@/api/client'
-import { Plus, Pencil, Trash2, Loader2, RefreshCw, X, Copy, Check, AlertTriangle, Power } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, Loader2, RefreshCw, X, Copy, Check, AlertTriangle, Power, Users, Ban, CheckCircle2, Search } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -31,6 +31,18 @@ interface Client {
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+interface ClientUser {
+  id: string
+  uid: number
+  display_name: string
+  email: string
+  security_level: number
+  providers: string[]
+  blocked: boolean
+  granted_at: string
+  last_used_at: string
 }
 
 const clients = ref<Client[]>([])
@@ -79,6 +91,19 @@ const showDeleteModal = ref(false)
 const deletingClient = ref<Client | null>(null)
 const deleting = ref(false)
 const togglingClientId = ref('')
+
+const usersModal = ref(false)
+const usersClient = ref<Client | null>(null)
+const clientUsers = ref<ClientUser[]>([])
+const clientUsersTotal = ref(0)
+const clientUsersOffset = ref(0)
+const clientUsersLimit = ref(20)
+const clientUsersSearch = ref('')
+const clientUsersLoading = ref(false)
+const clientUserActionId = ref('')
+
+const clientUsersFrom = computed(() => (clientUsersTotal.value === 0 ? 0 : clientUsersOffset.value + 1))
+const clientUsersTo = computed(() => Math.min(clientUsersOffset.value + clientUsersLimit.value, clientUsersTotal.value))
 
 onMounted(fetchClients)
 
@@ -281,6 +306,90 @@ async function toggleClientActive(client: Client) {
   }
 }
 
+async function openUsers(client: Client) {
+  usersClient.value = client
+  clientUsersOffset.value = 0
+  clientUsersSearch.value = ''
+  usersModal.value = true
+  await fetchClientUsers()
+}
+
+async function fetchClientUsers() {
+  if (!usersClient.value) return
+  clientUsersLoading.value = true
+  error.value = ''
+  try {
+    const params = new URLSearchParams({
+      offset: String(clientUsersOffset.value),
+      limit: String(clientUsersLimit.value),
+    })
+    if (clientUsersSearch.value.trim()) params.set('q', clientUsersSearch.value.trim())
+    const res = await api.get<ClientUser[]>(`/admin/clients/${usersClient.value.id}/users?${params}`)
+    clientUsers.value = res.data ?? []
+    clientUsersTotal.value = res.meta?.total ?? 0
+  } catch (e: any) {
+    error.value = e.message
+  } finally {
+    clientUsersLoading.value = false
+  }
+}
+
+function searchClientUsers() {
+  clientUsersOffset.value = 0
+  fetchClientUsers()
+}
+
+function prevClientUsersPage() {
+  if (clientUsersOffset.value === 0) return
+  clientUsersOffset.value = Math.max(0, clientUsersOffset.value - clientUsersLimit.value)
+  fetchClientUsers()
+}
+
+function nextClientUsersPage() {
+  if (clientUsersOffset.value + clientUsersLimit.value >= clientUsersTotal.value) return
+  clientUsersOffset.value += clientUsersLimit.value
+  fetchClientUsers()
+}
+
+async function blockClientUser(user: ClientUser) {
+  if (!usersClient.value || !window.confirm(t('adminClients.blockUserConfirm', { uid: user.uid }))) return
+  clientUserActionId.value = user.id
+  try {
+    await api.post(`/admin/clients/${usersClient.value.id}/users/${user.id}/block`)
+    user.blocked = true
+  } catch (e: any) {
+    error.value = e.message
+  } finally {
+    clientUserActionId.value = ''
+  }
+}
+
+async function unblockClientUser(user: ClientUser) {
+  if (!usersClient.value || !window.confirm(t('adminClients.unblockUserConfirm', { uid: user.uid }))) return
+  clientUserActionId.value = user.id
+  try {
+    await api.del(`/admin/clients/${usersClient.value.id}/users/${user.id}/block`)
+    user.blocked = false
+  } catch (e: any) {
+    error.value = e.message
+  } finally {
+    clientUserActionId.value = ''
+  }
+}
+
+async function revokeClientUser(user: ClientUser) {
+  if (!usersClient.value || !window.confirm(t('adminClients.revokeUserConfirm', { uid: user.uid }))) return
+  clientUserActionId.value = user.id
+  try {
+    await api.del(`/admin/clients/${usersClient.value.id}/users/${user.id}/authorization`)
+    await fetchClientUsers()
+  } catch (e: any) {
+    error.value = e.message
+  } finally {
+    clientUserActionId.value = ''
+  }
+}
+
 function prevPage() {
   if (offset.value > 0) {
     offset.value = Math.max(0, offset.value - limit.value)
@@ -382,6 +491,9 @@ function formatDateTime(value: string) {
                 <button @click="toggleClientActive(client)" :disabled="togglingClientId === client.id" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
                   <Loader2 v-if="togglingClientId === client.id" class="w-3 h-3 animate-spin" />
                   <Power v-else class="w-3 h-3" /> {{ client.is_active ? $t('adminClients.disable') : $t('adminClients.enable') }}
+                </button>
+                <button @click="openUsers(client)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
+                  <Users class="w-3 h-3" /> {{ $t('adminClients.authorizedUsers') }}
                 </button>
                 <button v-if="client.is_confidential" @click="confirmRotate(client)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
                   <RefreshCw class="w-3 h-3" /> {{ $t('adminClients.rotateSecret') }}
@@ -557,6 +669,123 @@ function formatDateTime(value: string) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div v-if="usersModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="usersModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-6xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <h2 class="text-lg font-semibold">{{ $t('adminClients.authorizedUsers') }}</h2>
+            <p class="text-sm text-muted-foreground mt-1">{{ usersClient?.client_name }}</p>
+          </div>
+          <button @click="usersModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
+        </div>
+
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div class="relative w-full sm:max-w-sm">
+            <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              v-model="clientUsersSearch"
+              type="text"
+              :placeholder="$t('adminClients.searchUsersPlaceholder')"
+              class="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10"
+              @keyup.enter="searchClientUsers"
+            />
+          </div>
+          <button @click="searchClientUsers" :disabled="clientUsersLoading" class="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50">
+            <Loader2 v-if="clientUsersLoading" class="w-4 h-4 animate-spin" />
+            <Search v-else class="w-4 h-4" />
+            {{ $t('search') }}
+          </button>
+        </div>
+
+        <div v-if="clientUsersLoading && clientUsers.length === 0" class="flex items-center justify-center py-12 text-muted-foreground">
+          <Loader2 class="w-5 h-5 animate-spin mr-2" /> {{ $t('loading') }}
+        </div>
+        <div v-else class="border border-border rounded-xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <tr>
+                  <th class="px-4 py-3">{{ $t('adminClients.userUid') }}</th>
+                  <th class="px-4 py-3">{{ $t('adminUsers.name') }}</th>
+                  <th class="px-4 py-3">{{ $t('adminUsers.email') }}</th>
+                  <th class="px-4 py-3">{{ $t('adminClients.securityLevel') }}</th>
+                  <th class="px-4 py-3">{{ $t('adminClients.providers') }}</th>
+                  <th class="px-4 py-3">{{ $t('adminClients.authorizationStatus') }}</th>
+                  <th class="px-4 py-3">{{ $t('adminClients.lastUsedAt') }}</th>
+                  <th class="px-4 py-3 text-right">{{ $t('actions') }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border">
+                <tr v-if="clientUsers.length === 0">
+                  <td colspan="8" class="px-4 py-10 text-center text-muted-foreground">{{ $t('adminClients.noAuthorizedUsers') }}</td>
+                </tr>
+                <tr v-for="user in clientUsers" :key="user.id" class="hover:bg-muted/30 transition-colors">
+                  <td class="px-4 py-3 align-top font-mono text-xs whitespace-nowrap">{{ user.uid }}</td>
+                  <td class="px-4 py-3 align-top font-medium whitespace-nowrap">{{ user.display_name || '-' }}</td>
+                  <td class="px-4 py-3 align-top text-muted-foreground whitespace-nowrap">{{ user.email || '-' }}</td>
+                  <td class="px-4 py-3 align-top whitespace-nowrap">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted">L{{ user.security_level }}</span>
+                  </td>
+                  <td class="px-4 py-3 align-top">
+                    <div v-if="user.providers?.length" class="flex flex-wrap gap-1.5">
+                      <span v-for="provider in user.providers" :key="provider" class="px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground">{{ provider }}</span>
+                    </div>
+                    <span v-else class="text-muted-foreground">-</span>
+                  </td>
+                  <td class="px-4 py-3 align-top whitespace-nowrap">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" :class="user.blocked ? 'bg-destructive/10 text-destructive' : 'bg-green-50 text-green-700'">
+                      <Ban v-if="user.blocked" class="w-3 h-3" />
+                      <CheckCircle2 v-else class="w-3 h-3" />
+                      {{ user.blocked ? $t('adminClients.blocked') : $t('adminClients.allowed') }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 align-top text-muted-foreground whitespace-nowrap text-xs">{{ formatDateTime(user.last_used_at) }}</td>
+                  <td class="px-4 py-3 align-top">
+                    <div class="flex justify-end gap-2 flex-wrap">
+                      <button
+                        v-if="user.blocked"
+                        @click="unblockClientUser(user)"
+                        :disabled="clientUserActionId === user.id"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50"
+                      >
+                        <Loader2 v-if="clientUserActionId === user.id" class="w-3.5 h-3.5 animate-spin" />
+                        {{ $t('adminClients.unblockUser') }}
+                      </button>
+                      <button
+                        v-else
+                        @click="blockClientUser(user)"
+                        :disabled="clientUserActionId === user.id"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-destructive/30 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/5 transition-colors disabled:opacity-50"
+                      >
+                        <Loader2 v-if="clientUserActionId === user.id" class="w-3.5 h-3.5 animate-spin" />
+                        {{ $t('adminClients.blockUser') }}
+                      </button>
+                      <button
+                        @click="revokeClientUser(user)"
+                        :disabled="clientUserActionId === user.id"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50"
+                      >
+                        <Loader2 v-if="clientUserActionId === user.id" class="w-3.5 h-3.5 animate-spin" />
+                        {{ $t('adminClients.revokeAuthorization') }}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div v-if="clientUsersTotal > 0" class="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+          <span>{{ $t('showing', { from: clientUsersFrom, to: clientUsersTo, total: clientUsersTotal }) }}</span>
+          <div class="flex gap-2">
+            <button @click="prevClientUsersPage" :disabled="clientUsersOffset === 0" class="px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors disabled:opacity-40">{{ $t('prev') }}</button>
+            <button @click="nextClientUsersPage" :disabled="clientUsersOffset + clientUsersLimit >= clientUsersTotal" class="px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors disabled:opacity-40">{{ $t('next') }}</button>
+          </div>
+        </div>
       </div>
     </div>
 

@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -106,16 +107,21 @@ func (h *UserInfoHandler) SetAlias(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	if err := h.accessCtrl.ValidateAlias(r.Context(), req.Alias); err != nil {
-		Error(w, http.StatusBadRequest, "invalid_alias", err.Error())
-		return
-	}
 	user, err := h.userRepo.GetByID(r.Context(), userID)
 	if err != nil {
 		mapAuthError(w, err)
 		return
 	}
-	user.Alias = &req.Alias
+	if user.Alias != nil && strings.TrimSpace(*user.Alias) != "" {
+		Error(w, http.StatusConflict, "alias_already_set", "alias can only be set once")
+		return
+	}
+	if err := h.accessCtrl.ValidateAlias(r.Context(), req.Alias); err != nil {
+		Error(w, http.StatusBadRequest, "invalid_alias", err.Error())
+		return
+	}
+	alias := strings.TrimSpace(req.Alias)
+	user.Alias = &alias
 	if err := h.userRepo.Update(r.Context(), user); err != nil {
 		Error(w, http.StatusInternalServerError, "internal", err.Error())
 		return

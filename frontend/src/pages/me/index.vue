@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/api/client'
-import { Loader2, Check, BadgeCheck, AtSign, KeyRound, UserPen, ImagePlus, Mail, X, Fingerprint, Plus, Trash2, Pencil } from 'lucide-vue-next'
+import { Loader2, Check, BadgeCheck, AtSign, KeyRound, UserPen, ImagePlus, Mail, X, Fingerprint, Plus, Trash2, Pencil, Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePasswordPolicy } from '@/composables/usePasswordPolicy'
 import { usePasskey, type PasskeyCredential } from '@/composables/usePasskey'
@@ -23,6 +23,7 @@ const alias = ref('')
 const aliasLoading = ref(false)
 const aliasMsg = ref('')
 const aliasError = ref('')
+const aliasLocked = computed(() => !!auth.user?.alias)
 
 // Password form
 const oldPassword = ref('')
@@ -30,8 +31,18 @@ const newPassword = ref('')
 const passwordLoading = ref(false)
 const passwordMsg = ref('')
 const passwordError = ref('')
+const showOldPassword = ref(false)
+const showNewPassword = ref(false)
 
 const newPasswordErrors = computed(() => newPassword.value ? validate(newPassword.value) : [])
+const newPasswordValid = computed(() => newPassword.value.length > 0 && newPasswordErrors.value.length === 0)
+const newPasswordChecks = computed(() => ({
+  minLength: !newPasswordErrors.value.includes('min_length'),
+  upper: !newPasswordErrors.value.includes('require_upper'),
+  lower: !newPasswordErrors.value.includes('require_lower'),
+  digit: !newPasswordErrors.value.includes('require_digit'),
+  symbol: !newPasswordErrors.value.includes('require_symbol'),
+}))
 
 // Passkey management
 const { loading: passkeyLoading, error: passkeyError, registerPasskey, listPasskeys, deletePasskey, renamePasskey } = usePasskey()
@@ -92,6 +103,10 @@ async function updateProfile() {
 async function updateAlias() {
   aliasMsg.value = ''
   aliasError.value = ''
+  if (aliasLocked.value) {
+    aliasError.value = t('profile.aliasLocked')
+    return
+  }
   aliasLoading.value = true
   try {
     await api.put('/me/alias', { alias: alias.value })
@@ -214,11 +229,9 @@ function formatPasskeyDate(iso: string | null) {
           </template>
         </div>
         <div v-if="verificationError" class="text-xs text-destructive mt-1">{{ verificationError }}</div>
-        <div v-if="auth.user?.uid" class="text-xs text-muted-foreground font-mono mt-1">
-          {{ $t('profile.uid') }} {{ auth.user.uid }}
-        </div>
-        <div v-if="auth.user?.alias" class="text-sm text-muted-foreground mt-0.5">
-          @{{ auth.user.alias }}
+        <div v-if="auth.user?.uid || auth.user?.alias" class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground font-mono">
+          <span v-if="auth.user?.uid">{{ $t('profile.uid') }} {{ auth.user.uid }}</span>
+          <span v-if="auth.user?.alias">@{{ auth.user.alias }}</span>
         </div>
       </div>
     </div>
@@ -318,7 +331,7 @@ function formatPasskeyDate(iso: string | null) {
         <div>
           <label class="block text-sm font-medium mb-1.5" for="alias">{{ $t('profile.aliasLabel') }}</label>
           <p class="text-xs text-muted-foreground mb-2">
-            {{ $t('profile.aliasHint') }}
+            {{ aliasLocked ? $t('profile.aliasLocked') : $t('profile.aliasHint') }}
           </p>
           <input
             id="alias"
@@ -327,7 +340,8 @@ function formatPasskeyDate(iso: string | null) {
             required
             pattern="[a-zA-Z0-9_-]+"
             placeholder="my-alias"
-            class="w-full px-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all font-mono"
+            :readonly="aliasLocked"
+            class="w-full px-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all font-mono read-only:bg-muted/40 read-only:text-muted-foreground"
           />
         </div>
         <div>
@@ -345,7 +359,7 @@ function formatPasskeyDate(iso: string | null) {
           </div>
           <button
             type="submit"
-            :disabled="aliasLoading"
+            :disabled="aliasLoading || aliasLocked"
             class="px-4 py-2 text-sm font-medium bg-foreground text-white rounded-lg hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             <Loader2 v-if="aliasLoading" class="w-4 h-4 animate-spin" />
@@ -363,50 +377,70 @@ function formatPasskeyDate(iso: string | null) {
       <form @submit.prevent="changePassword" class="space-y-4 max-w-md">
         <div>
           <label class="block text-sm font-medium mb-1.5" for="oldPassword">{{ $t('profile.currentPassword') }}</label>
-          <input
-            id="oldPassword"
-            v-model="oldPassword"
-            type="password"
-            required
-            autocomplete="current-password"
-            class="w-full px-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
-          />
+          <div class="relative">
+            <input
+              id="oldPassword"
+              v-model="oldPassword"
+              :type="showOldPassword ? 'text' : 'password'"
+              required
+              autocomplete="current-password"
+              class="w-full px-3.5 pr-10 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+            />
+            <button
+              type="button"
+              @click="showOldPassword = !showOldPassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <EyeOff v-if="showOldPassword" class="w-4 h-4" />
+              <Eye v-else class="w-4 h-4" />
+            </button>
+          </div>
         </div>
         <div>
           <label class="block text-sm font-medium mb-1.5" for="newPassword">{{ $t('profile.newPassword') }}</label>
-          <input
-            id="newPassword"
-            v-model="newPassword"
-            type="password"
-            required
-            minlength="8"
-            autocomplete="new-password"
-            class="w-full px-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
-          />
+          <div class="relative">
+            <input
+              id="newPassword"
+              v-model="newPassword"
+              :type="showNewPassword ? 'text' : 'password'"
+              required
+              :minlength="policy.min_length"
+              autocomplete="new-password"
+              class="w-full px-3.5 pr-10 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+            />
+            <button
+              type="button"
+              @click="showNewPassword = !showNewPassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <EyeOff v-if="showNewPassword" class="w-4 h-4" />
+              <Eye v-else class="w-4 h-4" />
+            </button>
+          </div>
           <!-- Password policy hints -->
           <div v-if="hasRequirements && newPassword" class="mt-2 space-y-1">
-            <div class="flex items-center gap-1.5 text-xs" :class="newPassword.length >= policy.min_length ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="newPassword.length >= policy.min_length" class="w-3 h-3" />
+            <div class="flex items-center gap-1.5 text-xs" :class="newPasswordChecks.minLength ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="newPasswordChecks.minLength" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.minLength', { n: policy.min_length }) }}
             </div>
-            <div v-if="policy.require_upper" class="flex items-center gap-1.5 text-xs" :class="/[A-Z]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[A-Z]/.test(newPassword)" class="w-3 h-3" />
+            <div v-if="policy.require_upper" class="flex items-center gap-1.5 text-xs" :class="newPasswordChecks.upper ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="newPasswordChecks.upper" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.requireUpper') }}
             </div>
-            <div v-if="policy.require_lower" class="flex items-center gap-1.5 text-xs" :class="/[a-z]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[a-z]/.test(newPassword)" class="w-3 h-3" />
+            <div v-if="policy.require_lower" class="flex items-center gap-1.5 text-xs" :class="newPasswordChecks.lower ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="newPasswordChecks.lower" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.requireLower') }}
             </div>
-            <div v-if="policy.require_digit" class="flex items-center gap-1.5 text-xs" :class="/[0-9]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[0-9]/.test(newPassword)" class="w-3 h-3" />
+            <div v-if="policy.require_digit" class="flex items-center gap-1.5 text-xs" :class="newPasswordChecks.digit ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="newPasswordChecks.digit" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.requireDigit') }}
             </div>
-            <div v-if="policy.require_symbol" class="flex items-center gap-1.5 text-xs" :class="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(newPassword)" class="w-3 h-3" />
+            <div v-if="policy.require_symbol" class="flex items-center gap-1.5 text-xs" :class="newPasswordChecks.symbol ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="newPasswordChecks.symbol" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.requireSymbol') }}
             </div>
@@ -427,7 +461,7 @@ function formatPasskeyDate(iso: string | null) {
           </div>
           <button
             type="submit"
-            :disabled="passwordLoading"
+            :disabled="passwordLoading || !oldPassword || !newPasswordValid"
             class="px-4 py-2 text-sm font-medium bg-foreground text-white rounded-lg hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             <Loader2 v-if="passwordLoading" class="w-4 h-4 animate-spin" />

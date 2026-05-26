@@ -218,12 +218,13 @@ func RunMigrations(db *sql.DB) error {
 		request_id TEXT,
 		session_type TEXT,
 		client_id TEXT,
-		signature TEXT UNIQUE,
+		signature TEXT,
 		subject TEXT NOT NULL DEFAULT '',
 		data BLOB,
 		created_at DATETIME NOT NULL,
 		expires_at DATETIME,
-		active BOOLEAN NOT NULL DEFAULT 1
+		active BOOLEAN NOT NULL DEFAULT 1,
+		UNIQUE(session_type, signature)
 	);
 
 	CREATE TABLE IF NOT EXISTS risk_reports (
@@ -306,6 +307,9 @@ func RunMigrations(db *sql.DB) error {
 	if err := migrateSocialBindingsLifecycle(db); err != nil {
 		return err
 	}
+	if err := migrateOAuth2SessionsSignatureScope(db); err != nil {
+		return err
+	}
 	if _, err := db.Exec(`UPDATE users SET role = 'user' WHERE role IS NULL OR TRIM(role) = ''`); err != nil {
 		return fmt.Errorf("repair user roles: %w", err)
 	}
@@ -313,6 +317,7 @@ func RunMigrations(db *sql.DB) error {
 	indexStmts := []string{
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_uid ON users(uid)`,
 		`CREATE INDEX IF NOT EXISTS idx_oauth2_sessions_subject ON oauth2_sessions(subject)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth2_sessions_type_signature ON oauth2_sessions(session_type, signature)`,
 		`CREATE INDEX IF NOT EXISTS idx_oauth2_sessions_type_active ON oauth2_sessions(session_type, active)`,
 		`CREATE INDEX IF NOT EXISTS idx_oauth2_sessions_client_active ON oauth2_sessions(client_id, active)`,
 		`CREATE INDEX IF NOT EXISTS idx_social_bindings_user_id ON social_bindings(user_id)`,
@@ -437,11 +442,56 @@ func migrateSocialBindingsLifecycle(db *sql.DB) error {
 	return nil
 }
 
+func migrateOAuth2SessionsSignatureScope(db *sql.DB) error {
+	var createSQL string
+	if err := db.QueryRow(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'oauth2_sessions'`).Scan(&createSQL); err != nil {
+		return fmt.Errorf("inspect oauth2_sessions schema: %w", err)
+	}
+	compact := compactSQL(createSQL)
+	if !strings.Contains(compact, "signaturetextunique") && strings.Contains(compact, "unique(session_type,signature)") {
+		return nil
+	}
+
+	migration := `
+		PRAGMA foreign_keys=OFF;
+		CREATE TABLE IF NOT EXISTS oauth2_sessions_v2 (
+			id TEXT PRIMARY KEY,
+			request_id TEXT,
+			session_type TEXT,
+			client_id TEXT,
+			signature TEXT,
+			subject TEXT NOT NULL DEFAULT '',
+			data BLOB,
+			created_at DATETIME NOT NULL,
+			expires_at DATETIME,
+			active BOOLEAN NOT NULL DEFAULT 1,
+			UNIQUE(session_type, signature)
+		);
+		INSERT OR IGNORE INTO oauth2_sessions_v2 (
+			id, request_id, session_type, client_id, signature, subject, data, created_at, expires_at, active
+		)
+		SELECT
+			id, request_id, session_type, client_id, signature, COALESCE(subject, ''), data, created_at, expires_at, active
+		FROM oauth2_sessions;
+		DROP TABLE oauth2_sessions;
+		ALTER TABLE oauth2_sessions_v2 RENAME TO oauth2_sessions;
+		PRAGMA foreign_keys=ON;
+	`
+	if _, err := db.Exec(migration); err != nil {
+		return fmt.Errorf("migrate oauth2_sessions signature scope: %w", err)
+	}
+	return nil
+}
+
 func containsLegacySocialBindingUnique(createSQL string) bool {
-	compact := strings.ToLower(strings.ReplaceAll(createSQL, " ", ""))
+	return strings.Contains(compactSQL(createSQL), "unique(provider,provider_uid)")
+}
+
+func compactSQL(sql string) string {
+	compact := strings.ToLower(strings.ReplaceAll(sql, " ", ""))
 	compact = strings.ReplaceAll(compact, "\n", "")
 	compact = strings.ReplaceAll(compact, "\t", "")
-	return strings.Contains(compact, "unique(provider,provider_uid)")
+	return compact
 }
 
 // toNullString converts a *string to sql.NullString.

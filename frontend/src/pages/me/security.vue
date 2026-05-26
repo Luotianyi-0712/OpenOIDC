@@ -11,6 +11,7 @@ interface MissingCondition {
   provider: string
   min_binding_days: number
   is_bound: boolean
+  is_satisfied: boolean
   bound_days: number
 }
 
@@ -118,6 +119,12 @@ function providerLabel(provider: string): string {
   const translated = t(key)
   return translated !== key ? translated : provider
 }
+
+function conditionState(cond: MissingCondition): 'completed' | 'partial' | 'incomplete' {
+  if (cond.is_satisfied) return 'completed'
+  if (cond.is_bound) return 'partial'
+  return 'incomplete'
+}
 </script>
 
 <template>
@@ -207,13 +214,36 @@ function providerLabel(provider: string): string {
         </div>
         <p class="text-xs text-muted-foreground mb-4">{{ $t('security.nextLevelDesc', { name: info.next_level.rule_name }) }}</p>
         <div class="space-y-2">
-          <div v-for="cond in info.next_level.missing" :key="cond.provider" class="flex items-center gap-3 px-4 py-3 rounded-lg" :class="cond.is_bound ? 'bg-green-50' : 'bg-muted/50'">
-            <div class="w-6 h-6 rounded-full flex items-center justify-center shrink-0" :class="cond.is_bound ? 'bg-green-100 text-green-600' : 'bg-muted text-muted-foreground'">
-              <Check v-if="cond.is_bound" class="w-3.5 h-3.5" />
+          <div
+            v-for="cond in info.next_level.missing"
+            :key="cond.provider"
+            class="flex items-center gap-3 px-4 py-3 rounded-lg"
+            :class="{
+              'bg-green-50': conditionState(cond) === 'completed',
+              'bg-amber-50': conditionState(cond) === 'partial',
+              'bg-muted/50': conditionState(cond) === 'incomplete',
+            }"
+          >
+            <div
+              class="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+              :class="{
+                'bg-green-100 text-green-600': conditionState(cond) === 'completed',
+                'bg-amber-100 text-amber-600': conditionState(cond) === 'partial',
+                'bg-muted text-muted-foreground': conditionState(cond) === 'incomplete',
+              }"
+            >
+              <Check v-if="conditionState(cond) !== 'incomplete'" class="w-3.5 h-3.5" />
               <X v-else class="w-3.5 h-3.5" />
             </div>
             <div class="flex-1">
-              <div class="text-sm font-medium" :class="cond.is_bound ? 'text-green-700' : 'text-foreground'">
+              <div
+                class="text-sm font-medium"
+                :class="{
+                  'text-green-700': conditionState(cond) === 'completed',
+                  'text-amber-700': conditionState(cond) === 'partial',
+                  'text-foreground': conditionState(cond) === 'incomplete',
+                }"
+              >
                 {{ $t('security.bindProvider', { provider: providerLabel(cond.provider) }) }}
               </div>
               <div v-if="cond.min_binding_days > 0" class="text-xs text-muted-foreground">
@@ -225,8 +255,15 @@ function providerLabel(provider: string): string {
                 </template>
               </div>
             </div>
-            <span class="text-xs font-medium px-2 py-0.5 rounded-full" :class="cond.is_bound && (cond.min_binding_days <= 0 || cond.bound_days >= cond.min_binding_days) ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'">
-              {{ cond.is_bound && (cond.min_binding_days <= 0 || cond.bound_days >= cond.min_binding_days) ? $t('security.completed') : $t('security.incomplete') }}
+            <span
+              class="text-xs font-medium px-2 py-0.5 rounded-full"
+              :class="{
+                'bg-green-100 text-green-700': conditionState(cond) === 'completed',
+                'bg-amber-100 text-amber-700': conditionState(cond) === 'partial',
+                'bg-muted text-muted-foreground': conditionState(cond) === 'incomplete',
+              }"
+            >
+              {{ conditionState(cond) === 'completed' ? $t('security.completed') : conditionState(cond) === 'partial' ? $t('security.partial') : $t('security.incomplete') }}
             </span>
           </div>
         </div>

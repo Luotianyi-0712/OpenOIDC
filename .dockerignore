@@ -28,5 +28,7 @@ coverage
 *.sqlite3
 data
 
+cmd/oauth-test-client
+
 .claude
 .agents

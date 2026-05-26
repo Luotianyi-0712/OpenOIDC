@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Mail, Lock, Loader2, Fingerprint } from 'lucide-vue-next'
+import { Mail, Lock, Loader2, Fingerprint, Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePublicConfig, getProviderIcon, isGoogleProvider, GOOGLE_SVG } from '@/composables/usePublicConfig'
 import { useToastStore } from '@/stores/toast'
@@ -21,10 +21,12 @@ const { token: turnstileToken, containerId: turnstileId, reset: resetTurnstile, 
 
 const email = ref('')
 const password = ref('')
+const showPassword = ref(false)
 const error = ref('')
 const loading = ref(false)
 
 const { loading: passkeyLoading, error: passkeyError, loginWithPasskey } = usePasskey()
+const loginProviders = computed(() => providers.value.filter(p => p.login_enabled !== false))
 
 function safeReturnTo(value: unknown) {
   return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : '/me'
@@ -56,7 +58,7 @@ onMounted(() => {
 
 function socialLogin(provider: string) {
   const returnTo = safeReturnTo(route.query.return_to)
-  window.location.href = `/api/v1/social/${provider}/begin?return_to=${encodeURIComponent(returnTo)}`
+  window.location.href = `/api/v1/social/${provider}/begin?intent=login&return_to=${encodeURIComponent(returnTo)}`
 }
 
 async function onSubmit() {
@@ -111,9 +113,9 @@ async function onSubmit() {
     </button>
 
     <!-- Social buttons (dynamic from backend) -->
-    <div v-if="settings.social_login_enabled && providers.length" class="flex flex-col gap-2.5">
+    <div v-if="settings.social_login_enabled && loginProviders.length" class="flex flex-col gap-2.5">
       <button
-        v-for="p in providers"
+        v-for="p in loginProviders"
         :key="p.name"
         type="button"
         class="w-full border border-border rounded-lg py-2.5 px-4 text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2.5"
@@ -175,12 +177,20 @@ async function onSubmit() {
           <input
             id="password"
             v-model="password"
-            type="password"
+            :type="showPassword ? 'text' : 'password'"
             required
             autocomplete="current-password"
             placeholder="Enter your password"
-            class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+            class="w-full pl-9.5 pr-10 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
           />
+          <button
+            type="button"
+            @click="showPassword = !showPassword"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <EyeOff v-if="showPassword" class="w-4 h-4" />
+            <Eye v-else class="w-4 h-4" />
+          </button>
         </div>
       </div>
       <div v-if="settings.turnstile_site_key" :id="turnstileId" class="flex justify-center"></div>

@@ -34,9 +34,11 @@ func (r *Registry) Register(p port.SocialProvider) {
 	r.providers[p.Name()] = p
 	if _, ok := r.publicProviders[p.Name()]; !ok {
 		r.publicProviders[p.Name()] = port.EnabledSocialProvider{
-			Name:        p.Name(),
-			DisplayName: providerDisplayName(p.Name()),
-			Type:        domain.ProviderTypeBuiltIn,
+			Name:            p.Name(),
+			DisplayName:     providerDisplayName(p.Name()),
+			Type:            domain.ProviderTypeBuiltIn,
+			LoginEnabled:    true,
+			RegisterEnabled: true,
 		}
 	}
 }
@@ -85,6 +87,20 @@ func (r *Registry) IsEnabled(name string) bool {
 	defer r.mu.RUnlock()
 	_, ok := r.providers[name]
 	return ok
+}
+
+func (r *Registry) IsLoginEnabled(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	p, ok := r.publicProviders[name]
+	return ok && p.LoginEnabled
+}
+
+func (r *Registry) IsRegisterEnabled(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	p, ok := r.publicProviders[name]
+	return ok && p.RegisterEnabled
 }
 
 func (r *Registry) Reload(ctx context.Context) error {
@@ -223,14 +239,22 @@ func providerPublicInfo(cfg *domain.ProviderConfig) port.EnabledSocialProvider {
 		displayName = providerDisplayName(name)
 	}
 	info := port.EnabledSocialProvider{
-		Name:        name,
-		DisplayName: displayName,
-		Type:        domain.ProviderType(cfg),
-		SortOrder:   cfg.SortOrder,
+		Name:            name,
+		DisplayName:     displayName,
+		Type:            domain.ProviderType(cfg),
+		LoginEnabled:    true,
+		RegisterEnabled: true,
+		SortOrder:       cfg.SortOrder,
 	}
 	if cfg.ExtraConfig != nil {
 		if iconURL, _ := cfg.ExtraConfig["icon_url"].(string); iconURL != "" {
 			info.IconURL = iconURL
+		}
+		if v, ok := cfg.ExtraConfig["login_enabled"].(bool); ok {
+			info.LoginEnabled = v
+		}
+		if v, ok := cfg.ExtraConfig["register_enabled"].(bool); ok {
+			info.RegisterEnabled = v
 		}
 	}
 	return info

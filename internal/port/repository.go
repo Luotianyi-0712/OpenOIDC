@@ -128,9 +128,12 @@ type RiskReportRepository interface {
 
 type RiskListRepository interface {
 	Add(ctx context.Context, entry *domain.RiskListEntry) error
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.RiskListEntry, error)
 	Check(ctx context.Context, provider, providerUID string) (*domain.RiskListEntry, error)
 	List(ctx context.Context, offset, limit int) ([]*domain.RiskListEntry, int64, error)
+	ListByUser(ctx context.Context, userID uuid.UUID) ([]*domain.RiskListEntry, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	DeleteByReport(ctx context.Context, reportID uuid.UUID) error
 }
 
 type PasskeyRepository interface {

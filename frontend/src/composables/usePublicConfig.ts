@@ -6,6 +6,8 @@ export interface EnabledProvider {
   display_name: string
   type?: string
   icon_url?: string
+  login_enabled: boolean
+  register_enabled: boolean
 }
 
 export interface PublicSettings {
@@ -19,6 +21,7 @@ export interface PublicSettings {
   turnstile_site_key: string
   developer_min_trust_level: number
   passkey_enabled: boolean
+  version: string
 }
 
 const PROVIDER_ICONS: Record<string, { path: string; color: string }> = {
@@ -98,6 +101,7 @@ export function usePublicConfig() {
     turnstile_site_key: '',
     developer_min_trust_level: 1,
     passkey_enabled: true,
+    version: '1.0.0',
   })
   const loaded = ref(false)
 
@@ -121,6 +125,7 @@ export function usePublicConfig() {
           turnstile_site_key: d.turnstile_site_key || '',
           developer_min_trust_level: parseInt(d.developer_min_trust_level) || 1,
           passkey_enabled: d.passkey_enabled !== 'false',
+          version: d.version || '1.0.0',
         }
       }
     } catch {

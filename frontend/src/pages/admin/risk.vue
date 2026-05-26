@@ -12,7 +12,13 @@ interface RiskReport {
   id: string
   client_id: string
   reporter_id: string
+  reporter_uid?: number
+  reporter_email?: string
+  reporter_display_name?: string
   target_id: string
+  target_uid?: number
+  target_email?: string
+  target_display_name?: string
   reason: string
   category: string
   status: string
@@ -24,6 +30,9 @@ interface RiskListEntry {
   provider: string
   provider_uid: string
   user_id: string | null
+  user_uid?: number
+  user_email?: string
+  user_display_name?: string
   reason: string
   created_at: string
 }
@@ -137,6 +146,12 @@ function categoryLabel(cat: string): string {
   const key = `adminRisk.categories.${cat}`
   return t(key)
 }
+
+function userLabel(uid?: number, email?: string, fallback?: string | null): string {
+  if (uid) return `UID ${uid}`
+  if (email) return email
+  return fallback || '-'
+}
 </script>
 
 <template>
@@ -193,9 +208,9 @@ function categoryLabel(cat: string): string {
                 <span class="text-muted-foreground">{{ new Date(report.created_at).toLocaleString() }}</span>
               </div>
               <p class="mt-2 text-sm">{{ report.reason }}</p>
-              <div class="mt-2 flex gap-4 text-xs text-muted-foreground">
-                <span>{{ $t('adminRisk.target') }}: <code class="font-mono break-all">{{ report.target_id }}</code></span>
-                <span>{{ $t('adminRisk.reporter') }}: <code class="font-mono break-all">{{ report.reporter_id }}</code></span>
+              <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span>{{ $t('adminRisk.target') }}: <code class="font-mono">{{ userLabel(report.target_uid, report.target_email, report.target_id) }}</code></span>
+                <span>{{ $t('adminRisk.reporter') }}: <code class="font-mono">{{ userLabel(report.reporter_uid, report.reporter_email, report.reporter_id) }}</code></span>
               </div>
             </div>
             <div class="flex gap-2 shrink-0">
@@ -246,7 +261,7 @@ function categoryLabel(cat: string): string {
             <tr v-for="entry in blacklist" :key="entry.id" class="border-b border-border/50">
               <td class="py-2.5 pr-4 font-mono text-xs">{{ entry.provider }}</td>
               <td class="py-2.5 pr-4 font-mono text-xs truncate max-w-[200px]">{{ entry.provider_uid }}</td>
-              <td class="py-2.5 pr-4 font-mono text-xs truncate max-w-[200px]">{{ entry.user_id || '-' }}</td>
+              <td class="py-2.5 pr-4 font-mono text-xs whitespace-nowrap">{{ userLabel(entry.user_uid, entry.user_email, entry.user_id) }}</td>
               <td class="py-2.5 pr-4 text-xs">{{ entry.reason }}</td>
               <td class="py-2.5 pr-4 text-xs text-muted-foreground">{{ new Date(entry.created_at).toLocaleString() }}</td>
               <td class="py-2.5">

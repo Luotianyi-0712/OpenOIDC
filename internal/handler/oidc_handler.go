@@ -300,6 +300,15 @@ func (h *OIDCHandler) ConsentContext(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusForbidden, "forbidden", "consent challenge does not belong to current user")
 		return
 	}
+	developerName := "platform"
+	if developerID, err := uuid.Parse(challenge.DeveloperID); err == nil {
+		if developer, err := h.userRepo.GetByID(r.Context(), developerID); err == nil {
+			developerName = developer.DisplayName
+			if developerName == "" {
+				developerName = developer.Email
+			}
+		}
+	}
 	JSON(w, http.StatusOK, map[string]any{
 		"client": map[string]any{
 			"client_id":    challenge.ClientID,
@@ -307,10 +316,9 @@ func (h *OIDCHandler) ConsentContext(w http.ResponseWriter, r *http.Request) {
 			"description":  challenge.ClientDescription,
 			"logo_url":     challenge.ClientLogoURL,
 			"homepage_url": challenge.WebsiteURL,
-			"redirect_uri": challenge.RedirectURI,
 		},
 		"developer": map[string]any{
-			"id": challenge.DeveloperID,
+			"name": developerName,
 		},
 		"scopes": challenge.Scopes,
 	})

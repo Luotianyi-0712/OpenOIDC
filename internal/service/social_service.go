@@ -63,6 +63,7 @@ const (
 type oauthStateData struct {
 	Mode     string    `json:"mode"`
 	Provider string    `json:"provider"`
+	Intent   string    `json:"intent,omitempty"`
 	UserID   uuid.UUID `json:"user_id,omitempty"`
 	ReturnTo string    `json:"return_to,omitempty"`
 }
@@ -70,6 +71,7 @@ type oauthStateData struct {
 type OAuthStateInfo struct {
 	Mode     string
 	Provider string
+	Intent   string
 	UserID   uuid.UUID
 	ReturnTo string
 }
@@ -86,6 +88,7 @@ func (s *SocialService) PeekState(ctx context.Context, state string) (*OAuthStat
 	return &OAuthStateInfo{
 		Mode:     data.Mode,
 		Provider: data.Provider,
+		Intent:   data.Intent,
 		UserID:   data.UserID,
 		ReturnTo: data.ReturnTo,
 	}, nil
@@ -205,12 +208,19 @@ func (s *SocialService) CompleteBinding(ctx context.Context, userID uuid.UUID, p
 	return binding, nil
 }
 
-func (s *SocialService) BeginSocialLogin(ctx context.Context, provider, returnTo string) (string, error) {
+func (s *SocialService) BeginSocialLogin(ctx context.Context, provider, returnTo, intent string) (string, error) {
 	if !s.isSettingEnabled(ctx, "social_login_enabled") {
 		return "", ErrSocialLoginDisabled
 	}
 	if !s.registry.IsEnabled(provider) {
 		return "", ErrProviderDisabled
+	}
+	if intent == "register" {
+		if !s.registry.IsRegisterEnabled(provider) {
+			return "", ErrSocialRegistrationDisabled
+		}
+	} else if !s.registry.IsLoginEnabled(provider) {
+		return "", ErrSocialLoginDisabled
 	}
 	prov, err := s.registry.Get(provider)
 	if err != nil {
@@ -223,6 +233,7 @@ func (s *SocialService) BeginSocialLogin(ctx context.Context, provider, returnTo
 	data, _ := json.Marshal(oauthStateData{
 		Mode:     oauthStateModeLogin,
 		Provider: provider,
+		Intent:   intent,
 		ReturnTo: returnTo,
 	})
 	if err := s.cache.SetOAuthState(ctx, state, data, 10*time.Minute); err != nil {
@@ -245,6 +256,13 @@ func (s *SocialService) CompleteSocialLogin(ctx context.Context, provider string
 		return nil, nil, ErrInvalidToken
 	}
 	if !s.isSettingEnabled(ctx, "social_login_enabled") {
+		return nil, nil, ErrSocialLoginDisabled
+	}
+	if stateData.Intent == "register" {
+		if !s.registry.IsRegisterEnabled(provider) {
+			return nil, nil, ErrSocialRegistrationDisabled
+		}
+	} else if !s.registry.IsLoginEnabled(provider) {
 		return nil, nil, ErrSocialLoginDisabled
 	}
 	prov, err := s.registry.Get(provider)

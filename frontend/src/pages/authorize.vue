@@ -18,11 +18,10 @@ interface ConsentContext {
     name: string
     description: string
     logo_url: string
-    redirect_uri: string
     homepage_url: string
   }
   developer: {
-    id: string
+    name: string
   }
   scopes: string[]
 }
@@ -130,8 +129,8 @@ async function handleDeny() {
         <div class="mt-3 grid gap-2 text-xs text-muted-foreground">
           <div class="flex items-center gap-2 min-w-0">
             <Building2 class="w-3.5 h-3.5 shrink-0" />
-            <span class="shrink-0">{{ $t('authorize.developerId') }}</span>
-            <span class="font-mono text-foreground truncate">{{ consent.developer.id || $t('authorize.unknownDeveloper') }}</span>
+            <span class="shrink-0">{{ $t('authorize.developer') }}</span>
+            <span class="text-foreground truncate">{{ consent.developer.name || $t('authorize.unknownDeveloper') }}</span>
           </div>
           <div v-if="consent.client.homepage_url" class="flex items-center gap-2 min-w-0">
             <LinkIcon class="w-3.5 h-3.5 shrink-0" />
@@ -142,11 +141,6 @@ async function handleDeny() {
               rel="noopener noreferrer"
               class="font-mono text-foreground truncate hover:underline"
             >{{ consent.client.homepage_url }}</a>
-          </div>
-          <div class="flex items-center gap-2 min-w-0">
-            <LinkIcon class="w-3.5 h-3.5 shrink-0" />
-            <span class="shrink-0">{{ $t('authorize.redirectTo') }}</span>
-            <span class="font-mono truncate">{{ consent.client.redirect_uri }}</span>
           </div>
         </div>
       </div>

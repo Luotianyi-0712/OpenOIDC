@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
-import { KeyRound, Loader2, CheckCircle, ArrowLeft, Check, X } from 'lucide-vue-next'
+import { KeyRound, Loader2, CheckCircle, ArrowLeft, Check, X, Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePasswordPolicy } from '@/composables/usePasswordPolicy'
 
@@ -18,9 +18,18 @@ const error = ref('')
 const success = ref(false)
 const loading = ref(false)
 const noToken = ref(false)
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
 
 const passwordErrors = computed(() => newPassword.value ? validate(newPassword.value) : [])
 const passwordValid = computed(() => newPassword.value.length > 0 && passwordErrors.value.length === 0)
+const passwordChecks = computed(() => ({
+  minLength: !passwordErrors.value.includes('min_length'),
+  upper: !passwordErrors.value.includes('require_upper'),
+  lower: !passwordErrors.value.includes('require_lower'),
+  digit: !passwordErrors.value.includes('require_digit'),
+  symbol: !passwordErrors.value.includes('require_symbol'),
+}))
 
 onMounted(() => {
   token.value = (route.query.token as string) || ''
@@ -111,37 +120,45 @@ function goLogin() {
             <input
               id="newPwd"
               v-model="newPassword"
-              type="password"
+              :type="showNewPassword ? 'text' : 'password'"
               required
-              minlength="8"
+              :minlength="policy.min_length"
               autocomplete="new-password"
-              class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+              class="w-full pl-9.5 pr-10 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
             />
+            <button
+              type="button"
+              @click="showNewPassword = !showNewPassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <EyeOff v-if="showNewPassword" class="w-4 h-4" />
+              <Eye v-else class="w-4 h-4" />
+            </button>
           </div>
           <!-- Password policy hints -->
           <div v-if="hasRequirements && newPassword" class="mt-2 space-y-1">
-            <div class="flex items-center gap-1.5 text-xs" :class="newPassword.length >= policy.min_length ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="newPassword.length >= policy.min_length" class="w-3 h-3" />
+            <div class="flex items-center gap-1.5 text-xs" :class="passwordChecks.minLength ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="passwordChecks.minLength" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.minLength', { n: policy.min_length }) }}
             </div>
-            <div v-if="policy.require_upper" class="flex items-center gap-1.5 text-xs" :class="/[A-Z]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[A-Z]/.test(newPassword)" class="w-3 h-3" />
+            <div v-if="policy.require_upper" class="flex items-center gap-1.5 text-xs" :class="passwordChecks.upper ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="passwordChecks.upper" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.requireUpper') }}
             </div>
-            <div v-if="policy.require_lower" class="flex items-center gap-1.5 text-xs" :class="/[a-z]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[a-z]/.test(newPassword)" class="w-3 h-3" />
+            <div v-if="policy.require_lower" class="flex items-center gap-1.5 text-xs" :class="passwordChecks.lower ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="passwordChecks.lower" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.requireLower') }}
             </div>
-            <div v-if="policy.require_digit" class="flex items-center gap-1.5 text-xs" :class="/[0-9]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[0-9]/.test(newPassword)" class="w-3 h-3" />
+            <div v-if="policy.require_digit" class="flex items-center gap-1.5 text-xs" :class="passwordChecks.digit ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="passwordChecks.digit" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.requireDigit') }}
             </div>
-            <div v-if="policy.require_symbol" class="flex items-center gap-1.5 text-xs" :class="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(newPassword) ? 'text-success' : 'text-muted-foreground'">
-              <Check v-if="/[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~]/.test(newPassword)" class="w-3 h-3" />
+            <div v-if="policy.require_symbol" class="flex items-center gap-1.5 text-xs" :class="passwordChecks.symbol ? 'text-success' : 'text-muted-foreground'">
+              <Check v-if="passwordChecks.symbol" class="w-3 h-3" />
               <X v-else class="w-3 h-3" />
               {{ $t('passwordPolicy.requireSymbol') }}
             </div>
@@ -154,17 +171,25 @@ function goLogin() {
             <input
               id="confirmPwd"
               v-model="confirmPassword"
-              type="password"
+              :type="showConfirmPassword ? 'text' : 'password'"
               required
-              minlength="8"
+              :minlength="policy.min_length"
               autocomplete="new-password"
-              class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+              class="w-full pl-9.5 pr-10 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
             />
+            <button
+              type="button"
+              @click="showConfirmPassword = !showConfirmPassword"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <EyeOff v-if="showConfirmPassword" class="w-4 h-4" />
+              <Eye v-else class="w-4 h-4" />
+            </button>
           </div>
         </div>
         <button
           type="submit"
-          :disabled="loading"
+          :disabled="loading || !passwordValid"
           class="w-full bg-foreground text-white rounded-full py-2.5 text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mt-1"
         >
           <Loader2 v-if="loading" class="w-4 h-4 animate-spin" />

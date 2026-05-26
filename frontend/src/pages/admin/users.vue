@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
-import { Search, Pencil, Trash2, Loader2, ShieldCheck, X, Plus, Eye, Monitor, KeyRound } from 'lucide-vue-next'
+import { Search, Pencil, Trash2, Loader2, ShieldCheck, X, Plus, Eye, EyeOff, Monitor, KeyRound, Check } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { usePasswordPolicy } from '@/composables/usePasswordPolicy'
 
 const { t } = useI18n()
 const auth = useAuthStore()
 const toast = useToastStore()
+const { policy, hasRequirements, validate } = usePasswordPolicy()
 
 interface User {
   id: string
@@ -97,6 +99,7 @@ const error = ref('')
 
 const showCreateModal = ref(false)
 const createForm = ref({ email: '', password: '', display_name: '', role: 'user' })
+const showCreatePassword = ref(false)
 const creating = ref(false)
 
 const showModal = ref(false)
@@ -135,7 +138,20 @@ const deleting = ref(false)
 const showResetPasswordModal = ref(false)
 const resetPasswordUser = ref<User | null>(null)
 const resetPasswordForm = ref({ new_password: '' })
+const resetPasswordError = ref('')
+const showResetPassword = ref(false)
 const resettingPassword = ref(false)
+const resetPasswordErrors = computed(() => resetPasswordForm.value.new_password ? validate(resetPasswordForm.value.new_password) : [])
+const resetPasswordChecks = computed(() => {
+  const value = resetPasswordForm.value.new_password
+  return {
+    minLength: value.length >= policy.value.min_length,
+    upper: /[A-Z]/.test(value),
+    lower: /[a-z]/.test(value),
+    digit: /[0-9]/.test(value),
+    symbol: /[!@#$%^&*()\-_=+\[\]{};:,.<>/?\\|`~'"']/.test(value),
+  }
+})
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -175,6 +191,7 @@ async function fetchUsers() {
 
 function openCreate() {
   createForm.value = { email: '', password: '', display_name: '', role: 'user' }
+  showCreatePassword.value = false
   showCreateModal.value = true
 }
 
@@ -378,18 +395,25 @@ async function deleteUser() {
 function openResetPassword(user: User) {
   resetPasswordUser.value = user
   resetPasswordForm.value = { new_password: '' }
+  resetPasswordError.value = ''
+  showResetPassword.value = false
   showResetPasswordModal.value = true
 }
 
 async function resetPassword() {
   if (!resetPasswordUser.value) return
+  resetPasswordError.value = ''
+  if (resetPasswordErrors.value.length > 0) {
+    resetPasswordError.value = t('passwordPolicy.notMet')
+    return
+  }
   resettingPassword.value = true
   error.value = ''
   try {
     await api.post(`/admin/users/${resetPasswordUser.value.id}/reset-password`, resetPasswordForm.value)
     showResetPasswordModal.value = false
   } catch (e: any) {
-    error.value = e.message
+    resetPasswordError.value = e.message
   } finally {
     resettingPassword.value = false
   }
@@ -549,7 +573,17 @@ function roleLabel(role?: string) {
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminUsers.passwordLabel') }}</label>
-            <input v-model="createForm.password" type="password" required minlength="6" :placeholder="$t('adminUsers.passwordPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+            <div class="relative">
+              <input v-model="createForm.password" :type="showCreatePassword ? 'text' : 'password'" required minlength="6" :placeholder="$t('adminUsers.passwordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+              <button
+                type="button"
+                @click="showCreatePassword = !showCreatePassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <EyeOff v-if="showCreatePassword" class="w-4 h-4" />
+                <Eye v-else class="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminUsers.displayName') }}</label>
@@ -846,14 +880,54 @@ function roleLabel(role?: string) {
           <button @click="showResetPasswordModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
         </div>
         <p class="text-sm text-muted-foreground mb-5">{{ $t('adminUsers.resetPasswordHint', { email: resetPasswordUser?.email || '' }) }}</p>
+        <div v-if="resetPasswordError" class="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {{ resetPasswordError }}
+        </div>
         <form @submit.prevent="resetPassword" class="flex flex-col gap-4">
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminUsers.newPassword') }}</label>
-            <input v-model="resetPasswordForm.new_password" type="password" required minlength="6" :placeholder="$t('adminUsers.newPasswordPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+            <div class="relative">
+              <input v-model="resetPasswordForm.new_password" :type="showResetPassword ? 'text' : 'password'" required :minlength="policy.min_length" :placeholder="$t('adminUsers.newPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+              <button
+                type="button"
+                @click="showResetPassword = !showResetPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <EyeOff v-if="showResetPassword" class="w-4 h-4" />
+                <Eye v-else class="w-4 h-4" />
+              </button>
+            </div>
+            <div v-if="hasRequirements && resetPasswordForm.new_password" class="mt-2 space-y-1">
+              <div class="flex items-center gap-1.5 text-xs" :class="resetPasswordChecks.minLength ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="resetPasswordChecks.minLength" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.minLength', { n: policy.min_length }) }}
+              </div>
+              <div v-if="policy.require_upper" class="flex items-center gap-1.5 text-xs" :class="resetPasswordChecks.upper ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="resetPasswordChecks.upper" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.requireUpper') }}
+              </div>
+              <div v-if="policy.require_lower" class="flex items-center gap-1.5 text-xs" :class="resetPasswordChecks.lower ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="resetPasswordChecks.lower" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.requireLower') }}
+              </div>
+              <div v-if="policy.require_digit" class="flex items-center gap-1.5 text-xs" :class="resetPasswordChecks.digit ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="resetPasswordChecks.digit" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.requireDigit') }}
+              </div>
+              <div v-if="policy.require_symbol" class="flex items-center gap-1.5 text-xs" :class="resetPasswordChecks.symbol ? 'text-success' : 'text-muted-foreground'">
+                <Check v-if="resetPasswordChecks.symbol" class="w-3 h-3" />
+                <X v-else class="w-3 h-3" />
+                {{ $t('passwordPolicy.requireSymbol') }}
+              </div>
+            </div>
           </div>
           <div class="flex justify-end gap-2 mt-2">
             <button type="button" @click="showResetPasswordModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
-            <button type="submit" :disabled="resettingPassword" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+            <button type="submit" :disabled="resettingPassword || resetPasswordErrors.length > 0" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">
               <Loader2 v-if="resettingPassword" class="w-4 h-4 animate-spin" /> {{ $t('adminUsers.resetPwd') }}
             </button>
           </div>

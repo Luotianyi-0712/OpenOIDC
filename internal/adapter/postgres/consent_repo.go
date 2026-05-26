@@ -20,17 +20,17 @@ func NewConsentRepo(db *pgxpool.Pool) *ConsentRepo {
 }
 
 func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) ([]*domain.UserAuthorization, error) {
-	// Postgres uses oauth2_access_tokens table (not oauth2_sessions).
-	// The 'subject' column stores the user ID.
 	rows, err := r.db.Query(ctx,
-		`SELECT oa.client_id, oc.name, MIN(oa.created_at) as granted_at
-		 FROM oauth2_access_tokens oa
-		 JOIN oidc_clients oc ON oc.client_id = oa.client_id
-		 WHERE oa.active = true
-		   AND oa.subject = $1
-		   AND (oa.expires_at IS NULL OR oa.expires_at > NOW())
-		 GROUP BY oa.client_id, oc.name
-		 ORDER BY granted_at DESC`,
+		`SELECT auth.client_id, oc.name, MIN(auth.created_at) as granted_at
+			 FROM (
+			   SELECT client_id, subject, created_at FROM oauth2_access_tokens WHERE active = true
+			   UNION ALL
+			   SELECT client_id, subject, created_at FROM oauth2_refresh_tokens WHERE active = true
+			 ) auth
+			 JOIN oidc_clients oc ON oc.client_id = auth.client_id
+			 WHERE auth.subject = $1
+			 GROUP BY auth.client_id, oc.name
+			 ORDER BY granted_at DESC`,
 		userID.String())
 	if err != nil {
 		return nil, err
@@ -63,10 +63,13 @@ func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) 
 func (r *ConsentRepo) CountUniqueUsers(ctx context.Context, clientID string) (int64, error) {
 	var count int64
 	err := r.db.QueryRow(ctx,
-		`SELECT COUNT(DISTINCT subject) FROM oauth2_access_tokens
-		 WHERE client_id = $1 AND active = true
-		   AND subject != ''
-		   AND (expires_at IS NULL OR expires_at > NOW())`,
+		`SELECT COUNT(DISTINCT subject)
+			 FROM (
+			   SELECT subject FROM oauth2_access_tokens WHERE client_id = $1 AND active = true
+			   UNION ALL
+			   SELECT subject FROM oauth2_refresh_tokens WHERE client_id = $1 AND active = true
+			 ) auth
+			 WHERE subject != ''`,
 		clientID,
 	).Scan(&count)
 	if err != nil {
@@ -84,19 +87,22 @@ func (r *ConsentRepo) ListClientUsers(ctx context.Context, client *domain.OIDCCl
 	}
 	search = strings.TrimSpace(search)
 	pattern := "%" + search + "%"
-
-	where := `oa.client_id = $1 AND oa.active = true
-		AND oa.subject != ''
-		AND (oa.expires_at IS NULL OR oa.expires_at > NOW())
+	authSource := `(
+		SELECT client_id, subject, created_at FROM oauth2_access_tokens WHERE active = true
+		UNION ALL
+		SELECT client_id, subject, created_at FROM oauth2_refresh_tokens WHERE active = true
+	) auth`
+	where := `auth.client_id = $1
+		AND auth.subject != ''
 		AND u.deleted_at IS NULL
 		AND ($2 = '' OR u.id::text ILIKE $3 OR u.uid::text ILIKE $3 OR u.email ILIKE $3 OR u.display_name ILIKE $3)`
 
 	var total int64
 	if err := r.db.QueryRow(ctx,
 		`SELECT COUNT(DISTINCT u.id)
-		 FROM oauth2_access_tokens oa
-		 JOIN users u ON u.id::text = oa.subject
-		 WHERE `+where,
+			 FROM `+authSource+`
+			 JOIN users u ON u.id::text = auth.subject
+			 WHERE `+where,
 		client.ClientID, search, pattern,
 	).Scan(&total); err != nil {
 		return nil, 0, err
@@ -106,10 +112,10 @@ func (r *ConsentRepo) ListClientUsers(ctx context.Context, client *domain.OIDCCl
 		`SELECT u.id, u.uid, u.display_name, u.email, u.security_level,
 		        COALESCE(array_remove(array_agg(DISTINCT sb.provider), NULL), ARRAY[]::text[]) AS providers,
 		        BOOL_OR(car.id IS NOT NULL) AS blocked,
-		        MIN(oa.created_at) AS granted_at,
-		        MAX(oa.created_at) AS last_used_at
-		 FROM oauth2_access_tokens oa
-		 JOIN users u ON u.id::text = oa.subject
+		        MIN(auth.created_at) AS granted_at,
+		        MAX(auth.created_at) AS last_used_at
+		 FROM `+authSource+`
+		 JOIN users u ON u.id::text = auth.subject
 		 LEFT JOIN social_bindings sb ON sb.user_id = u.id AND sb.status = 'active'
 		 LEFT JOIN client_access_rules car ON car.client_id = $4 AND car.rule_type = $5 AND car.rule_value = u.id::text
 		 WHERE `+where+`
@@ -139,7 +145,6 @@ func (r *ConsentRepo) ListClientUsers(ctx context.Context, client *domain.OIDCCl
 
 // DeleteByUserAndClient revokes a user's authorization to a specific client.
 func (r *ConsentRepo) DeleteByUserAndClient(ctx context.Context, userID uuid.UUID, clientID string) error {
-	// Deactivate across all token tables.
 	uid := userID.String()
 	_, _ = r.db.Exec(ctx, `UPDATE oauth2_access_tokens SET active = false WHERE subject = $1 AND client_id = $2`, uid, clientID)
 	_, _ = r.db.Exec(ctx, `UPDATE oauth2_refresh_tokens SET active = false WHERE subject = $1 AND client_id = $2`, uid, clientID)

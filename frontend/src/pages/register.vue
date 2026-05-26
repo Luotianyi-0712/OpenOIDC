@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Mail, Lock, User, Loader2, Check, X } from 'lucide-vue-next'
+import { Mail, Lock, User, Loader2, Check, X, Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePublicConfig, getProviderIcon, isGoogleProvider, GOOGLE_SVG } from '@/composables/usePublicConfig'
 import { useTurnstile } from '@/composables/useTurnstile'
@@ -20,6 +20,7 @@ const { policy, hasRequirements, validate } = usePasswordPolicy()
 const displayName = ref('')
 const email = ref('')
 const password = ref('')
+const showPassword = ref(false)
 const code = ref('')
 const codeSent = ref(false)
 const error = ref('')
@@ -45,9 +46,10 @@ const submitLabel = computed(() => {
   }
   return loading.value ? t('register.submitting') : t('register.submit')
 })
+const registerProviders = computed(() => providers.value.filter(p => p.register_enabled !== false))
 
 function socialLogin(provider: string) {
-  window.location.href = `/api/v1/social/${provider}/begin?return_to=/`
+  window.location.href = `/api/v1/social/${provider}/begin?intent=register&return_to=/`
 }
 
 async function sendCode() {
@@ -117,9 +119,9 @@ async function onSubmit() {
       </div>
 
       <!-- Social buttons (dynamic from backend) -->
-      <div v-if="settings.social_register_enabled && providers.length" class="flex flex-col gap-2.5">
+      <div v-if="settings.social_register_enabled && registerProviders.length" class="flex flex-col gap-2.5">
         <button
-          v-for="p in providers"
+          v-for="p in registerProviders"
           :key="p.name"
           type="button"
           class="w-full border border-border rounded-lg py-2.5 px-4 text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2.5"
@@ -143,7 +145,7 @@ async function onSubmit() {
       </div>
 
       <!-- Divider -->
-      <div v-if="settings.social_register_enabled && providers.length && settings.registration_enabled" class="flex items-center gap-3.5 my-6">
+      <div v-if="settings.social_register_enabled && registerProviders.length && settings.registration_enabled" class="flex items-center gap-3.5 my-6">
         <div class="flex-1 h-px bg-border" />
         <span class="text-muted-foreground text-xs font-medium uppercase tracking-wider">{{ $t('or') }}</span>
         <div class="flex-1 h-px bg-border" />
@@ -213,12 +215,20 @@ async function onSubmit() {
               <input
                 id="password"
                 v-model="password"
-                type="password"
+                :type="showPassword ? 'text' : 'password'"
                 required
                 autocomplete="new-password"
                 :placeholder="t('register.passwordPlaceholder')"
-                class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
+                class="w-full pl-9.5 pr-10 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
               />
+              <button
+                type="button"
+                @click="showPassword = !showPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <EyeOff v-if="showPassword" class="w-4 h-4" />
+                <Eye v-else class="w-4 h-4" />
+              </button>
             </div>
             <!-- Password policy hints -->
             <div v-if="hasRequirements" class="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2 space-y-1.5">

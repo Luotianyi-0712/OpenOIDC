@@ -164,6 +164,27 @@ func (r *RiskListRepo) Add(ctx context.Context, entry *domain.RiskListEntry) err
 	return err
 }
 
+func (r *RiskListRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.RiskListEntry, error) {
+	row := r.db.QueryRowContext(ctx,
+		`SELECT id, provider, provider_uid, user_id, reason, report_id, added_by, created_at
+			 FROM risk_list WHERE id = ?`, id.String())
+
+	var entry domain.RiskListEntry
+	var rawID string
+	var userID, reportID, addedBy sql.NullString
+	if err := row.Scan(&rawID, &entry.Provider, &entry.ProviderUID, &userID, &entry.Reason, &reportID, &addedBy, &entry.CreatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, port.ErrNotFound
+		}
+		return nil, err
+	}
+	entry.ID = uuid.MustParse(rawID)
+	entry.UserID = stringPtrToUUIDPtr(fromNullString(userID))
+	entry.ReportID = stringPtrToUUIDPtr(fromNullString(reportID))
+	entry.AddedBy = stringPtrToUUIDPtr(fromNullString(addedBy))
+	return &entry, nil
+}
+
 func (r *RiskListRepo) Check(ctx context.Context, provider, providerUID string) (*domain.RiskListEntry, error) {
 	row := r.db.QueryRowContext(ctx,
 		`SELECT id, provider, provider_uid, user_id, reason, report_id, added_by, created_at
@@ -216,8 +237,39 @@ func (r *RiskListRepo) List(ctx context.Context, offset, limit int) ([]*domain.R
 	return entries, total, nil
 }
 
+func (r *RiskListRepo) ListByUser(ctx context.Context, userID uuid.UUID) ([]*domain.RiskListEntry, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, provider, provider_uid, user_id, reason, report_id, added_by, created_at
+			 FROM risk_list WHERE user_id = ? ORDER BY created_at DESC`, userID.String())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	entries := make([]*domain.RiskListEntry, 0)
+	for rows.Next() {
+		var entry domain.RiskListEntry
+		var id string
+		var rowUserID, reportID, addedBy sql.NullString
+		if err := rows.Scan(&id, &entry.Provider, &entry.ProviderUID, &rowUserID, &entry.Reason, &reportID, &addedBy, &entry.CreatedAt); err != nil {
+			return nil, err
+		}
+		entry.ID = uuid.MustParse(id)
+		entry.UserID = stringPtrToUUIDPtr(fromNullString(rowUserID))
+		entry.ReportID = stringPtrToUUIDPtr(fromNullString(reportID))
+		entry.AddedBy = stringPtrToUUIDPtr(fromNullString(addedBy))
+		entries = append(entries, &entry)
+	}
+	return entries, rows.Err()
+}
+
 func (r *RiskListRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM risk_list WHERE id = ?`, id.String())
+	return err
+}
+
+func (r *RiskListRepo) DeleteByReport(ctx context.Context, reportID uuid.UUID) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM risk_list WHERE report_id = ?`, reportID.String())
 	return err
 }
 

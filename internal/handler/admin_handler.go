@@ -16,6 +16,7 @@ import (
 	mw "github.com/anthropic/oidc-platform/internal/handler/middleware"
 	"github.com/anthropic/oidc-platform/internal/port"
 	"github.com/anthropic/oidc-platform/internal/service"
+	"github.com/anthropic/oidc-platform/internal/version"
 )
 
 type AdminHandler struct {
@@ -563,6 +564,156 @@ func (h *AdminHandler) RotateClientSecret(w http.ResponseWriter, r *http.Request
 	JSON(w, http.StatusOK, map[string]any{"client_secret": secret})
 }
 
+func (h *AdminHandler) ListClientUsers(w http.ResponseWriter, r *http.Request) {
+	if h.consentRepo == nil {
+		Error(w, http.StatusNotImplemented, "not_implemented", "consent repository not available")
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_id", err.Error())
+		return
+	}
+	client, err := h.clientSvc.GetClient(r.Context(), id)
+	if err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	offset := parseIntDefault(r.URL.Query().Get("offset"), 0)
+	limit := parseIntDefault(r.URL.Query().Get("limit"), 20)
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	search := r.URL.Query().Get("q")
+	if strings.TrimSpace(search) == "" {
+		search = r.URL.Query().Get("search")
+	}
+	users, total, err := h.consentRepo.ListClientUsers(r.Context(), client, search, offset, limit)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	PaginatedJSON(w, http.StatusOK, users, total, offset, limit)
+}
+
+func (h *AdminHandler) BlockClientUser(w http.ResponseWriter, r *http.Request) {
+	client, targetID, ok := h.requireClientUser(w, r)
+	if !ok {
+		return
+	}
+	rules, err := h.clientSvc.ListAccessRules(r.Context(), client.ID)
+	if err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	for _, rule := range rules {
+		if domain.AccessRuleType(rule.RuleType) == domain.AccessRuleUserDeny && strings.EqualFold(rule.Value, targetID.String()) {
+			JSON(w, http.StatusOK, map[string]any{"blocked": true})
+			return
+		}
+	}
+	if _, err := h.clientSvc.AddAccessRule(r.Context(), client.ID, string(domain.AccessRuleUserDeny), targetID.String()); err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"blocked": true})
+}
+
+func (h *AdminHandler) UnblockClientUser(w http.ResponseWriter, r *http.Request) {
+	client, targetID, ok := h.requireClientUser(w, r)
+	if !ok {
+		return
+	}
+	rules, err := h.clientSvc.ListAccessRules(r.Context(), client.ID)
+	if err != nil {
+		mapAdminError(w, err)
+		return
+	}
+	for _, rule := range rules {
+		if domain.AccessRuleType(rule.RuleType) == domain.AccessRuleUserDeny && strings.EqualFold(rule.Value, targetID.String()) {
+			if err := h.clientSvc.RemoveAccessRule(r.Context(), rule.ID); err != nil {
+				mapAdminError(w, err)
+				return
+			}
+		}
+	}
+	JSON(w, http.StatusOK, map[string]any{"blocked": false})
+}
+
+func (h *AdminHandler) RevokeClientUserAuthorization(w http.ResponseWriter, r *http.Request) {
+	client, targetID, ok := h.requireClientUser(w, r)
+	if !ok {
+		return
+	}
+	if err := h.consentRepo.DeleteByUserAndClient(r.Context(), targetID, client.ClientID); err != nil {
+		Error(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	JSON(w, http.StatusOK, map[string]any{"revoked": true})
+}
+
+func (h *AdminHandler) requireClientUser(w http.ResponseWriter, r *http.Request) (*domain.OIDCClient, uuid.UUID, bool) {
+	if h.consentRepo == nil {
+		Error(w, http.StatusNotImplemented, "not_implemented", "consent repository not available")
+		return nil, uuid.Nil, false
+	}
+	clientID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		Error(w, http.StatusBadRequest, "invalid_id", err.Error())
+		return nil, uuid.Nil, false
+	}
+	client, err := h.clientSvc.GetClient(r.Context(), clientID)
+	if err != nil {
+		mapAdminError(w, err)
+		return nil, uuid.Nil, false
+	}
+	targetID, ok := h.parseUserIdentifier(w, r, chi.URLParam(r, "uid"))
+	if !ok {
+		return nil, uuid.Nil, false
+	}
+	apps, err := h.consentRepo.ListAuthorizedApps(r.Context(), targetID)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "internal", err.Error())
+		return nil, uuid.Nil, false
+	}
+	for _, app := range apps {
+		if app.ClientID == client.ClientID {
+			return client, targetID, true
+		}
+	}
+	Error(w, http.StatusForbidden, "not_authorized", "target user has not authorized this app")
+	return nil, uuid.Nil, false
+}
+
+func (h *AdminHandler) parseUserIdentifier(w http.ResponseWriter, r *http.Request, raw string) (uuid.UUID, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		Error(w, http.StatusBadRequest, "invalid_user_id", "user id required")
+		return uuid.Nil, false
+	}
+	if id, err := uuid.Parse(raw); err == nil {
+		if _, err := h.userRepo.GetByID(r.Context(), id); err != nil {
+			mapAdminError(w, err)
+			return uuid.Nil, false
+		}
+		return id, true
+	}
+	numericUID, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || numericUID <= 0 {
+		Error(w, http.StatusBadRequest, "invalid_user_id", "invalid user id")
+		return uuid.Nil, false
+	}
+	user, err := h.userRepo.GetByUID(r.Context(), numericUID)
+	if err != nil {
+		mapAdminError(w, err)
+		return uuid.Nil, false
+	}
+	return user.ID, true
+}
+
 type accessRuleRequest struct {
 	RuleType string `json:"rule_type"`
 	Value    string `json:"value"`
@@ -719,6 +870,8 @@ func (h *AdminHandler) GetProvider(w http.ResponseWriter, r *http.Request) {
 
 type updateProviderRequest struct {
 	Enabled               *bool    `json:"enabled"`
+	LoginEnabled          *bool    `json:"login_enabled"`
+	RegisterEnabled       *bool    `json:"register_enabled"`
 	ClientID              *string  `json:"client_id"`
 	ClientSecret          *string  `json:"client_secret"`
 	AppID                 *string  `json:"app_id"`
@@ -829,6 +982,12 @@ func applyProviderRequest(pc *domain.ProviderConfig, req updateProviderRequest) 
 	}
 	if req.DisplayName != nil {
 		pc.DisplayName = strings.TrimSpace(*req.DisplayName)
+	}
+	if req.LoginEnabled != nil {
+		setProviderExtra(pc, "login_enabled", *req.LoginEnabled)
+	}
+	if req.RegisterEnabled != nil {
+		setProviderExtra(pc, "register_enabled", *req.RegisterEnabled)
 	}
 	if req.ClientID != nil {
 		v := strings.TrimSpace(*req.ClientID)
@@ -960,13 +1119,15 @@ func cleanProviderStringSlice(items []string) []string {
 
 func providerPayload(pc *domain.ProviderConfig) map[string]any {
 	m := map[string]any{
-		"provider":     pc.Provider,
-		"display_name": pc.DisplayName,
-		"enabled":      pc.IsEnabled,
-		"type":         domain.ProviderType(pc),
-		"sort_order":   pc.SortOrder,
-		"created_at":   pc.CreatedAt,
-		"updated_at":   pc.UpdatedAt,
+		"provider":         pc.Provider,
+		"display_name":     pc.DisplayName,
+		"enabled":          pc.IsEnabled,
+		"login_enabled":    providerExtraBoolDefault(pc.ExtraConfig, "login_enabled", true),
+		"register_enabled": providerExtraBoolDefault(pc.ExtraConfig, "register_enabled", true),
+		"type":             domain.ProviderType(pc),
+		"sort_order":       pc.SortOrder,
+		"created_at":       pc.CreatedAt,
+		"updated_at":       pc.UpdatedAt,
 	}
 	if pc.ClientID != nil && *pc.ClientID != "" {
 		m["client_id"] = *pc.ClientID
@@ -1032,6 +1193,24 @@ func providerPayload(pc *domain.ProviderConfig) map[string]any {
 func providerExtraString(extra map[string]any, key string) string {
 	v, _ := extra[key].(string)
 	return strings.TrimSpace(v)
+}
+
+func providerExtraBoolDefault(extra map[string]any, key string, fallback bool) bool {
+	if extra == nil {
+		return fallback
+	}
+	v, ok := extra[key]
+	if !ok {
+		return fallback
+	}
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		return strings.TrimSpace(t) != "false"
+	default:
+		return fallback
+	}
 }
 
 func firstProviderExtraString(extra map[string]any, keys ...string) string {
@@ -1133,7 +1312,8 @@ func (h *AdminHandler) PublicSettings(w http.ResponseWriter, r *http.Request) {
 		"turnstile_site_key",
 		"developer_min_trust_level",
 	}
-	result := make(map[string]string, len(keys))
+	result := make(map[string]string, len(keys)+1)
+	result["version"] = version.Version
 	for _, key := range keys {
 		setting, err := h.adminSvc.GetSetting(r.Context(), key)
 		if err != nil {
@@ -1266,7 +1446,11 @@ func (h *AdminHandler) ListRiskReports(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	PaginatedJSON(w, http.StatusOK, reports, total, offset, limit)
+	out := make([]map[string]any, 0, len(reports))
+	for _, report := range reports {
+		out = append(out, h.riskReportPayload(r.Context(), report))
+	}
+	PaginatedJSON(w, http.StatusOK, out, total, offset, limit)
 }
 
 type confirmReportRequest struct {
@@ -1340,7 +1524,11 @@ func (h *AdminHandler) ListRiskList(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	PaginatedJSON(w, http.StatusOK, entries, total, offset, limit)
+	out := make([]map[string]any, 0, len(entries))
+	for _, entry := range entries {
+		out = append(out, h.riskEntryPayload(r.Context(), entry))
+	}
+	PaginatedJSON(w, http.StatusOK, out, total, offset, limit)
 }
 
 func (h *AdminHandler) AddRiskEntry(w http.ResponseWriter, r *http.Request) {
@@ -1359,11 +1547,20 @@ func (h *AdminHandler) AddRiskEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var userID *uuid.UUID
-	if strings.TrimSpace(req.UserID) != "" {
-		id, err := uuid.Parse(strings.TrimSpace(req.UserID))
+	if rawUserID := strings.TrimSpace(req.UserID); rawUserID != "" {
+		id, err := uuid.Parse(rawUserID)
 		if err != nil {
-			Error(w, http.StatusBadRequest, "invalid_user_id", err.Error())
-			return
+			numericUID, parseErr := strconv.ParseInt(rawUserID, 10, 64)
+			if parseErr != nil || numericUID <= 0 {
+				Error(w, http.StatusBadRequest, "invalid_user_id", err.Error())
+				return
+			}
+			user, lookupErr := h.userRepo.GetByUID(r.Context(), numericUID)
+			if lookupErr != nil {
+				mapAdminError(w, lookupErr)
+				return
+			}
+			id = user.ID
 		}
 		userID = &id
 	}
@@ -1530,6 +1727,54 @@ func (h *AdminHandler) auditPayload(ctx context.Context, log *domain.AuditLog) m
 	}
 	if log.UserID != nil {
 		if user, err := h.userRepo.GetByID(ctx, *log.UserID); err == nil {
+			payload["user_uid"] = user.UID
+			payload["user_email"] = user.Email
+			payload["user_display_name"] = user.DisplayName
+		}
+	}
+	return payload
+}
+
+func (h *AdminHandler) riskReportPayload(ctx context.Context, report *domain.RiskReport) map[string]any {
+	payload := map[string]any{
+		"id":          report.ID,
+		"client_id":   report.ClientID,
+		"reporter_id": report.ReporterID,
+		"target_id":   report.TargetID,
+		"reason":      report.Reason,
+		"category":    report.Category,
+		"status":      report.Status,
+		"admin_note":  report.AdminNote,
+		"resolved_at": report.ResolvedAt,
+		"resolved_by": report.ResolvedBy,
+		"created_at":  report.CreatedAt,
+	}
+	if target, err := h.userRepo.GetByID(ctx, report.TargetID); err == nil {
+		payload["target_uid"] = target.UID
+		payload["target_email"] = target.Email
+		payload["target_display_name"] = target.DisplayName
+	}
+	if reporter, err := h.userRepo.GetByID(ctx, report.ReporterID); err == nil {
+		payload["reporter_uid"] = reporter.UID
+		payload["reporter_email"] = reporter.Email
+		payload["reporter_display_name"] = reporter.DisplayName
+	}
+	return payload
+}
+
+func (h *AdminHandler) riskEntryPayload(ctx context.Context, entry *domain.RiskListEntry) map[string]any {
+	payload := map[string]any{
+		"id":           entry.ID,
+		"provider":     entry.Provider,
+		"provider_uid": entry.ProviderUID,
+		"user_id":      entry.UserID,
+		"reason":       entry.Reason,
+		"report_id":    entry.ReportID,
+		"added_by":     entry.AddedBy,
+		"created_at":   entry.CreatedAt,
+	}
+	if entry.UserID != nil {
+		if user, err := h.userRepo.GetByID(ctx, *entry.UserID); err == nil {
 			payload["user_uid"] = user.UID
 			payload["user_email"] = user.Email
 			payload["user_display_name"] = user.DisplayName

@@ -117,12 +117,28 @@ async function copyText(text: string, field: string) {
         </div>
 
         <form class="flex flex-col gap-5 px-6 py-5" @submit.prevent="emit('submit')">
-          <div class="flex items-center gap-3 p-3 rounded-lg bg-muted/40">
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" :checked="booleanField('enabled')" class="sr-only peer" @change="updateBooleanField('enabled', $event)" />
-              <span class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-foreground/10 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+          <div class="grid gap-3 rounded-lg bg-muted/40 p-3 sm:grid-cols-3">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <span class="relative inline-flex items-center">
+                <input type="checkbox" :checked="booleanField('enabled')" class="sr-only peer" @change="updateBooleanField('enabled', $event)" />
+                <span class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-foreground/10 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+              </span>
+              <span class="text-sm font-medium">{{ t('adminProviders.enabled') }}</span>
             </label>
-            <span class="text-sm font-medium">{{ t('adminProviders.enabled') }}</span>
+            <label class="flex items-center gap-3 cursor-pointer">
+              <span class="relative inline-flex items-center">
+                <input type="checkbox" :checked="booleanField('login_enabled')" class="sr-only peer" @change="updateBooleanField('login_enabled', $event)" />
+                <span class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-foreground/10 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+              </span>
+              <span class="text-sm font-medium">{{ t('adminProviders.loginEnabled') }}</span>
+            </label>
+            <label class="flex items-center gap-3 cursor-pointer">
+              <span class="relative inline-flex items-center">
+                <input type="checkbox" :checked="booleanField('register_enabled')" class="sr-only peer" @change="updateBooleanField('register_enabled', $event)" />
+                <span class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-foreground/10 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+              </span>
+              <span class="text-sm font-medium">{{ t('adminProviders.registerEnabled') }}</span>
+            </label>
           </div>
 
           <div v-if="isCreate" class="grid gap-4 md:grid-cols-2">

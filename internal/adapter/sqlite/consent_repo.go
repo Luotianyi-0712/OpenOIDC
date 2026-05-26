@@ -23,13 +23,12 @@ func NewConsentRepo(db *sql.DB) *ConsentRepo {
 func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) ([]*domain.UserAuthorization, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT os.client_id, oc.client_name, MIN(os.created_at) as granted_at
-		 FROM oauth2_sessions os
-		 JOIN oidc_clients oc ON oc.client_id = os.client_id
-		 WHERE os.active = 1 AND os.session_type = 'access_token'
-		   AND os.subject = ?
-		   AND (os.expires_at IS NULL OR os.expires_at > datetime('now'))
-		 GROUP BY os.client_id, oc.client_name
-		 ORDER BY granted_at DESC`,
+			 FROM oauth2_sessions os
+			 JOIN oidc_clients oc ON oc.client_id = os.client_id
+			 WHERE os.active = 1 AND os.session_type IN ('access_token', 'refresh_token')
+			   AND os.subject = ?
+			 GROUP BY os.client_id, oc.client_name
+			 ORDER BY granted_at DESC`,
 		userID.String())
 	if err != nil {
 		return nil, err
@@ -39,7 +38,7 @@ func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) 
 	var results []*domain.UserAuthorization
 	for rows.Next() {
 		var clientID, clientName string
-		var createdAt sql.NullTime
+		var createdAt sql.NullString
 
 		if err := rows.Scan(&clientID, &clientName, &createdAt); err != nil {
 			continue
@@ -51,9 +50,10 @@ func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) 
 			ClientID:   clientID,
 			ClientName: clientName,
 		}
-		if createdAt.Valid {
-			auth.GrantedAt = createdAt.Time
-			auth.LastUsedAt = createdAt.Time
+		if createdAt.Valid && createdAt.String != "" {
+			grantedAt := parseTimeLoose(createdAt.String)
+			auth.GrantedAt = grantedAt
+			auth.LastUsedAt = grantedAt
 		}
 		results = append(results, auth)
 	}
@@ -65,9 +65,8 @@ func (r *ConsentRepo) CountUniqueUsers(ctx context.Context, clientID string) (in
 	var count int64
 	err := r.db.QueryRowContext(ctx,
 		`SELECT COUNT(DISTINCT subject) FROM oauth2_sessions
-		 WHERE client_id = ? AND active = 1 AND session_type = 'access_token'
-		   AND subject != ''
-		   AND (expires_at IS NULL OR expires_at > datetime('now'))`,
+			 WHERE client_id = ? AND active = 1 AND session_type IN ('access_token', 'refresh_token')
+			   AND subject != ''`,
 		clientID,
 	).Scan(&count)
 	if err != nil {
@@ -86,18 +85,17 @@ func (r *ConsentRepo) ListClientUsers(ctx context.Context, client *domain.OIDCCl
 	search = strings.TrimSpace(search)
 	pattern := "%" + search + "%"
 
-	where := `os.client_id = ? AND os.active = 1 AND os.session_type = 'access_token'
+	where := `os.client_id = ? AND os.active = 1 AND os.session_type IN ('access_token', 'refresh_token')
 		AND os.subject != ''
-		AND (os.expires_at IS NULL OR os.expires_at > datetime('now'))
 		AND u.deleted_at IS NULL
 		AND (? = '' OR u.id LIKE ? OR CAST(u.uid AS TEXT) LIKE ? OR u.email LIKE ? OR u.display_name LIKE ?)`
 
 	var total int64
 	if err := r.db.QueryRowContext(ctx,
 		`SELECT COUNT(DISTINCT u.id)
-		 FROM oauth2_sessions os
-		 JOIN users u ON u.id = os.subject
-		 WHERE `+where,
+			 FROM oauth2_sessions os
+			 JOIN users u ON u.id = os.subject
+			 WHERE `+where,
 		client.ClientID, search, pattern, pattern, pattern, pattern,
 	).Scan(&total); err != nil {
 		return nil, 0, err
@@ -129,7 +127,7 @@ func (r *ConsentRepo) ListClientUsers(ctx context.Context, client *domain.OIDCCl
 		var id string
 		var providers string
 		var blocked int
-		var grantedAt, lastUsedAt sql.NullTime
+		var grantedAt, lastUsedAt sql.NullString
 		item := &domain.DeveloperAppUserSummary{}
 		if err := rows.Scan(&id, &item.UID, &item.DisplayName, &item.Email, &item.SecurityLevel, &providers, &blocked, &grantedAt, &lastUsedAt); err != nil {
 			return nil, 0, err
@@ -145,11 +143,11 @@ func (r *ConsentRepo) ListClientUsers(ctx context.Context, client *domain.OIDCCl
 			item.Providers = []string{}
 		}
 		item.Blocked = blocked > 0
-		if grantedAt.Valid {
-			item.GrantedAt = grantedAt.Time
+		if grantedAt.Valid && grantedAt.String != "" {
+			item.GrantedAt = parseTimeLoose(grantedAt.String)
 		}
-		if lastUsedAt.Valid {
-			item.LastUsedAt = lastUsedAt.Time
+		if lastUsedAt.Valid && lastUsedAt.String != "" {
+			item.LastUsedAt = parseTimeLoose(lastUsedAt.String)
 		}
 		users = append(users, item)
 	}
