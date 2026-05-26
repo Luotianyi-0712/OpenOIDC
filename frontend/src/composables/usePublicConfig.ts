@@ -18,6 +18,9 @@ export interface PublicSettings {
   social_login_enabled: boolean
   social_register_enabled: boolean
   social_binding_enabled: boolean
+  captcha_enabled: boolean
+  captcha_provider: string
+  captcha_site_key: string
   turnstile_site_key: string
   developer_min_trust_level: number
   passkey_enabled: boolean
@@ -98,6 +101,9 @@ export function usePublicConfig() {
     social_login_enabled: true,
     social_register_enabled: true,
     social_binding_enabled: true,
+    captcha_enabled: true,
+    captcha_provider: 'turnstile',
+    captcha_site_key: '',
     turnstile_site_key: '',
     developer_min_trust_level: 1,
     passkey_enabled: true,
@@ -122,6 +128,9 @@ export function usePublicConfig() {
           social_login_enabled: d.social_login_enabled !== 'false',
           social_register_enabled: d.social_register_enabled !== 'false',
           social_binding_enabled: d.social_binding_enabled !== 'false',
+          captcha_enabled: d.captcha_enabled !== 'false',
+          captcha_provider: d.captcha_provider || 'turnstile',
+          captcha_site_key: d.captcha_site_key || d.turnstile_site_key || '',
           turnstile_site_key: d.turnstile_site_key || '',
           developer_min_trust_level: parseInt(d.developer_min_trust_level) || 1,
           passkey_enabled: d.passkey_enabled !== 'false',

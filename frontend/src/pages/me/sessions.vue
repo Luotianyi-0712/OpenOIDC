@@ -107,35 +107,61 @@ function truncateUA(ua: string, max = 60) {
       {{ $t('sessions.noSessions') }}
     </div>
 
-    <div v-else class="border border-border rounded-xl overflow-hidden">
-      <div class="grid grid-cols-[1fr_2fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        <div>{{ $t('sessions.ip') }}</div>
-        <div>{{ $t('sessions.userAgent') }}</div>
-        <div>{{ $t('sessions.created') }}</div>
-        <div>{{ $t('sessions.expires') }}</div>
-        <div class="w-20"></div>
-      </div>
-      <div
-        v-for="session in sessions"
-        :key="session.id"
-        class="grid grid-cols-[1fr_2fr_1fr_1fr_auto] gap-4 px-5 py-3.5 border-t border-border text-sm items-center"
-      >
-        <div class="font-mono text-xs">{{ session.ip }}</div>
-        <div class="text-muted-foreground text-xs truncate" :title="session.user_agent">
-          {{ truncateUA(session.user_agent) }}
+    <div v-else>
+      <div class="hidden md:block border border-border rounded-xl overflow-hidden">
+        <div class="grid grid-cols-[1fr_2fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-muted/50 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div>{{ $t('sessions.ip') }}</div>
+          <div>{{ $t('sessions.userAgent') }}</div>
+          <div>{{ $t('sessions.created') }}</div>
+          <div>{{ $t('sessions.expires') }}</div>
+          <div class="w-20"></div>
         </div>
-        <div class="text-xs text-muted-foreground">{{ formatDate(session.created_at) }}</div>
-        <div class="text-xs text-muted-foreground">{{ formatDate(session.expires_at) }}</div>
-        <div class="w-20 flex justify-end">
-          <button
-            @click="confirmRevoke(session.id)"
-            :disabled="revokingId === session.id"
-            class="px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 disabled:opacity-50"
-          >
-            <Loader2 v-if="revokingId === session.id" class="w-3 h-3 animate-spin" />
-            <Trash2 v-else class="w-3 h-3" />
-            {{ $t('sessions.revoke') }}
-          </button>
+        <div
+          v-for="session in sessions"
+          :key="session.id"
+          class="grid grid-cols-[1fr_2fr_1fr_1fr_auto] gap-4 px-5 py-3.5 border-t border-border text-sm items-center"
+        >
+          <div class="font-mono text-xs">{{ session.ip }}</div>
+          <div class="text-muted-foreground text-xs truncate" :title="session.user_agent">
+            {{ truncateUA(session.user_agent) }}
+          </div>
+          <div class="text-xs text-muted-foreground">{{ formatDate(session.created_at) }}</div>
+          <div class="text-xs text-muted-foreground">{{ formatDate(session.expires_at) }}</div>
+          <div class="w-20 flex justify-end">
+            <button
+              @click="confirmRevoke(session.id)"
+              :disabled="revokingId === session.id"
+              class="px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 disabled:opacity-50"
+            >
+              <Loader2 v-if="revokingId === session.id" class="w-3 h-3 animate-spin" />
+              <Trash2 v-else class="w-3 h-3" />
+              {{ $t('sessions.revoke') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="md:hidden space-y-3">
+        <div v-for="session in sessions" :key="session.id" class="border border-border rounded-xl p-4 bg-background">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="font-mono text-xs break-all">{{ session.ip || '-' }}</div>
+              <div class="mt-1 text-xs text-muted-foreground break-words" :title="session.user_agent">{{ truncateUA(session.user_agent, 96) }}</div>
+            </div>
+            <button
+              @click="confirmRevoke(session.id)"
+              :disabled="revokingId === session.id"
+              class="shrink-0 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 disabled:opacity-50"
+            >
+              <Loader2 v-if="revokingId === session.id" class="w-3 h-3 animate-spin" />
+              <Trash2 v-else class="w-3 h-3" />
+              {{ $t('sessions.revoke') }}
+            </button>
+          </div>
+          <div class="mt-3 grid grid-cols-1 gap-2 text-xs text-muted-foreground">
+            <div><span class="font-medium text-foreground">{{ $t('sessions.created') }}：</span>{{ formatDate(session.created_at) }}</div>
+            <div><span class="font-medium text-foreground">{{ $t('sessions.expires') }}：</span>{{ formatDate(session.expires_at) }}</div>
+          </div>
         </div>
       </div>
     </div>

@@ -32,6 +32,7 @@ const BOOL_SETTINGS = new Set([
   'email_verification_required',
   'client_email_verification_default',
   'allow_public_clients',
+  'captcha_enabled',
   'turnstile_enabled',
   'social_login_enabled',
   'social_register_enabled',
@@ -48,6 +49,9 @@ const DEDICATED_SETTING_KEYS = new Set([
   ...SMTP_KEYS,
   'site_url',
   'allowed_email_domains',
+  'captcha_provider',
+  'captcha_site_key',
+  'captcha_secret_key',
   'turnstile_site_key',
   'turnstile_secret_key',
   'developer_min_trust_level',
@@ -92,10 +96,10 @@ const smtpForm = ref({ host: '', port: '465', username: '', password: '', from: 
 const showSmtpPassword = ref(false)
 const smtpSaving = ref(false)
 
-// Turnstile
-const turnstileForm = ref({ siteKey: '', secretKey: '' })
-const showTurnstileSecret = ref(false)
-const turnstileSaving = ref(false)
+// Captcha
+const captchaForm = ref({ provider: 'turnstile', siteKey: '', secretKey: '' })
+const showCaptchaSecret = ref(false)
+const captchaSaving = ref(false)
 
 // Email domain whitelist
 const domainWhitelist = ref('')
@@ -157,8 +161,11 @@ async function fetchSettings() {
       if (s.key === 'smtp_password') smtpForm.value.password = s.value
       if (s.key === 'smtp_from') smtpForm.value.from = s.value
       if (s.key === 'allowed_email_domains') domainWhitelist.value = s.value
-      if (s.key === 'turnstile_site_key') turnstileForm.value.siteKey = s.value
-      if (s.key === 'turnstile_secret_key') turnstileForm.value.secretKey = s.value
+      if (s.key === 'captcha_provider') captchaForm.value.provider = s.value || 'turnstile'
+      if (s.key === 'captcha_site_key') captchaForm.value.siteKey = s.value
+      if (s.key === 'captcha_secret_key') captchaForm.value.secretKey = s.value
+      if (s.key === 'turnstile_site_key' && !captchaForm.value.siteKey) captchaForm.value.siteKey = s.value
+      if (s.key === 'turnstile_secret_key' && !captchaForm.value.secretKey) captchaForm.value.secretKey = s.value
       if (s.key === 'developer_min_trust_level') developerMinLevel.value = parseInt(s.value) || 1
     }
   } catch (e: any) {
@@ -243,21 +250,28 @@ async function saveSmtp() {
   }
 }
 
-async function saveTurnstile() {
-  turnstileSaving.value = true
+async function saveCaptcha() {
+  captchaSaving.value = true
   error.value = ''
   success.value = ''
   try {
-    await api.put('/admin/settings/turnstile_site_key', { value: turnstileForm.value.siteKey, description: 'Cloudflare Turnstile site key' })
-    if (turnstileForm.value.secretKey) {
-      await api.put('/admin/settings/turnstile_secret_key', { value: turnstileForm.value.secretKey, description: 'Cloudflare Turnstile secret key' })
+    await api.put('/admin/settings/captcha_provider', { value: captchaForm.value.provider, description: 'Human verification provider: turnstile or hcaptcha' })
+    await api.put('/admin/settings/captcha_site_key', { value: captchaForm.value.siteKey, description: 'Captcha frontend site key' })
+    if (captchaForm.value.secretKey) {
+      await api.put('/admin/settings/captcha_secret_key', { value: captchaForm.value.secretKey, description: 'Captcha backend verification secret' })
     }
-    success.value = t('adminSettings.turnstileSaved')
+    if (captchaForm.value.provider === 'turnstile') {
+      await api.put('/admin/settings/turnstile_site_key', { value: captchaForm.value.siteKey, description: 'Cloudflare Turnstile site key' })
+      if (captchaForm.value.secretKey) {
+        await api.put('/admin/settings/turnstile_secret_key', { value: captchaForm.value.secretKey, description: 'Cloudflare Turnstile secret key' })
+      }
+    }
+    success.value = t('adminSettings.captchaSaved')
     setTimeout(() => (success.value = ''), 3000)
   } catch (e: any) {
     error.value = e.message
   } finally {
-    turnstileSaving.value = false
+    captchaSaving.value = false
   }
 }
 
@@ -486,32 +500,39 @@ async function deleteAlias(id: string) {
         </form>
       </div>
 
-      <!-- Turnstile (Captcha) -->
+      <!-- Captcha -->
       <div class="border border-border rounded-xl p-6 mt-8">
-        <h3 class="text-base font-semibold mb-2">{{ $t('adminSettings.turnstileTitle') }}</h3>
-        <p class="text-sm text-muted-foreground mb-4">{{ $t('adminSettings.turnstileDesc') }}</p>
-        <form @submit.prevent="saveTurnstile" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h3 class="text-base font-semibold mb-2">{{ $t('adminSettings.captchaTitle') }}</h3>
+        <p class="text-sm text-muted-foreground mb-4">{{ $t('adminSettings.captchaDesc') }}</p>
+        <form @submit.prevent="saveCaptcha" class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.turnstileSiteKey') }}</label>
-            <input v-model="turnstileForm.siteKey" type="text" placeholder="0x..." class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+            <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.captchaProvider') }}</label>
+            <select v-model="captchaForm.provider" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10">
+              <option value="turnstile">Cloudflare Turnstile</option>
+              <option value="hcaptcha">hCaptcha</option>
+            </select>
           </div>
           <div>
-            <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.turnstileSecretKey') }}</label>
+            <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.captchaSiteKey') }}</label>
+            <input v-model="captchaForm.siteKey" type="text" placeholder="site key" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.captchaSecretKey') }}</label>
             <div class="relative">
-              <input v-model="turnstileForm.secretKey" :type="showTurnstileSecret ? 'text' : 'password'" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+              <input v-model="captchaForm.secretKey" :type="showCaptchaSecret ? 'text' : 'password'" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
               <button
                 type="button"
-                @click="showTurnstileSecret = !showTurnstileSecret"
+                @click="showCaptchaSecret = !showCaptchaSecret"
                 class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
-                <EyeOff v-if="showTurnstileSecret" class="w-4 h-4" />
+                <EyeOff v-if="showCaptchaSecret" class="w-4 h-4" />
                 <Eye v-else class="w-4 h-4" />
               </button>
             </div>
           </div>
           <div class="md:col-span-2 flex justify-end">
-            <button type="submit" :disabled="turnstileSaving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">
-              <Loader2 v-if="turnstileSaving" class="w-4 h-4 animate-spin" />
+            <button type="submit" :disabled="captchaSaving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+              <Loader2 v-if="captchaSaving" class="w-4 h-4 animate-spin" />
               <Save v-else class="w-4 h-4" />
               {{ $t('save') }}
             </button>

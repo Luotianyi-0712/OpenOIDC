@@ -1311,6 +1311,9 @@ func (h *AdminHandler) PublicSettings(w http.ResponseWriter, r *http.Request) {
 		"social_login_enabled",
 		"social_register_enabled",
 		"social_binding_enabled",
+		"captcha_enabled",
+		"captcha_provider",
+		"captcha_site_key",
 		"turnstile_site_key",
 		"developer_min_trust_level",
 	}
@@ -1319,7 +1322,7 @@ func (h *AdminHandler) PublicSettings(w http.ResponseWriter, r *http.Request) {
 	for _, key := range keys {
 		setting, err := h.adminSvc.GetSetting(r.Context(), key)
 		if err != nil {
-			if key == "site_url" || key == "turnstile_site_key" || key == "developer_min_trust_level" {
+			if key == "site_url" || key == "captcha_provider" || key == "captcha_site_key" || key == "turnstile_site_key" || key == "developer_min_trust_level" {
 				result[key] = ""
 			} else {
 				result[key] = "true"

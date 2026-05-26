@@ -5,13 +5,14 @@ import { api } from '@/api/client'
 import { Mail, ArrowLeft, Loader2 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePublicConfig } from '@/composables/usePublicConfig'
-import { useTurnstile } from '@/composables/useTurnstile'
+import { useCaptcha } from '@/composables/useCaptcha'
 
 const { t } = useI18n()
 const { settings } = usePublicConfig()
 
-const { token: turnstileToken, containerId, reset: resetTurnstile } = useTurnstile(
-  () => settings.value.turnstile_site_key
+const { token: captchaToken, containerId: captchaId, reset: resetCaptcha } = useCaptcha(
+  () => settings.value.captcha_provider,
+  () => settings.value.captcha_site_key
 )
 
 const email = ref('')
@@ -25,14 +26,15 @@ async function onSubmit() {
   loading.value = true
   try {
     const headers: Record<string, string> = {}
-    if (turnstileToken.value) {
-      headers['X-Turnstile-Token'] = turnstileToken.value
+    if (captchaToken.value) {
+      headers['X-Captcha-Token'] = captchaToken.value
+      headers['X-Turnstile-Token'] = captchaToken.value
     }
     await api.post('/auth/forgot-password', { email: email.value }, headers)
     success.value = true
   } catch (e: any) {
     error.value = e.message || 'Something went wrong. Please try again.'
-    resetTurnstile()
+    resetCaptcha()
   } finally {
     loading.value = false
   }
@@ -81,8 +83,7 @@ async function onSubmit() {
           />
         </div>
       </div>
-      <!-- Turnstile widget -->
-      <div :id="containerId" class="flex justify-center"></div>
+      <div v-if="settings.captcha_enabled && settings.captcha_site_key" :id="captchaId" class="flex justify-center"></div>
       <button
         type="submit"
         :disabled="loading"

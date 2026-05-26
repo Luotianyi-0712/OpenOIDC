@@ -58,7 +58,7 @@ func (h *SocialHandler) Begin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	returnTo := r.URL.Query().Get("return_to")
-	if returnTo == "" {
+	if !isRelativePath(returnTo) {
 		returnTo = "/"
 	}
 
@@ -170,10 +170,22 @@ func (h *SocialHandler) redirectError(w http.ResponseWriter, r *http.Request, re
 }
 
 func isRelativePath(s string) bool {
-	if s == "" {
+	if s == "" || len(s) > 2048 || s[0] != '/' {
 		return false
 	}
-	return s[0] == '/'
+	if len(s) > 1 && (s[1] == '/' || s[1] == '\\') {
+		return false
+	}
+	for _, ch := range s {
+		if ch < 0x20 || ch == '\\' {
+			return false
+		}
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	return !u.IsAbs() && u.Host == ""
 }
 
 func errorCode(err error) string {

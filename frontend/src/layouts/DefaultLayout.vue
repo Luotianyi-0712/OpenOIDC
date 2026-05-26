@@ -103,7 +103,9 @@ function toggleLocale() {
         <!-- Right-side items -->
         <div class="flex items-center gap-3">
           <template v-if="auth.isLoggedIn">
-            <RouterLink v-if="auth.isAdmin" to="/admin" class="text-sm bg-foreground text-white px-4 py-2 rounded-full font-medium hover:bg-foreground/90 transition-colors">{{ $t('nav.admin') }}</RouterLink>
+            <RouterLink to="/me" class="hidden sm:inline-flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-3 py-2">{{ $t('nav.account') }}</RouterLink>
+            <RouterLink v-if="auth.canShowDeveloperConsole" to="/developer" class="hidden lg:inline-flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-3 py-2">{{ $t('nav.developers') }}</RouterLink>
+            <RouterLink v-if="auth.isAdmin" to="/admin" class="text-sm bg-foreground text-white px-3 sm:px-4 py-2 rounded-full font-medium hover:bg-foreground/90 transition-colors">{{ $t('nav.admin') }}</RouterLink>
           </template>
           <template v-else>
             <RouterLink to="/login" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-3 py-2">{{ $t('nav.login') }}</RouterLink>
@@ -171,6 +173,8 @@ function toggleLocale() {
         <!-- Auth links for mobile -->
         <div class="pt-4 space-y-1">
           <template v-if="auth.isLoggedIn">
+            <RouterLink to="/me" class="block py-3 text-lg font-medium" @click="mobileOpen = false">{{ $t('nav.account') }}</RouterLink>
+            <RouterLink v-if="auth.canShowDeveloperConsole" to="/developer" class="block py-3 text-lg font-medium" @click="mobileOpen = false">{{ $t('nav.developers') }}</RouterLink>
             <RouterLink v-if="auth.isAdmin" to="/admin" class="block py-3 text-lg font-medium" @click="mobileOpen = false">{{ $t('nav.admin') }}</RouterLink>
           </template>
           <template v-else>

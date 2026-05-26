@@ -417,6 +417,10 @@ func seedSettings(ctx context.Context, repo port.SettingsRepository, cfg *config
 		"social_login_enabled":                     "true",
 		"social_register_enabled":                  "true",
 		"social_binding_enabled":                   "true",
+		"captcha_enabled":                          "true",
+		"captcha_provider":                         "turnstile",
+		"captcha_site_key":                         "",
+		"captcha_secret_key":                       "",
 		"passkey_enabled":                          "true",
 	}
 	for key, value := range defaults {

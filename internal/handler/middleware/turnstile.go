@@ -12,11 +12,16 @@ import (
 	"github.com/anthropic/oidc-platform/internal/port"
 )
 
-const turnstileVerifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+const (
+	turnstileVerifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+	hcaptchaVerifyURL  = "https://hcaptcha.com/siteverify"
+)
 
-// Turnstile verifies Cloudflare Turnstile tokens.
-// If turnstile_secret_key is not configured in settings, the check is skipped.
 func Turnstile(settingsRepo port.SettingsRepository) func(http.Handler) http.Handler {
+	return Captcha(settingsRepo)
+}
+
+func Captcha(settingsRepo port.SettingsRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if settingsRepo == nil {
@@ -24,14 +29,28 @@ func Turnstile(settingsRepo port.SettingsRepository) func(http.Handler) http.Han
 				return
 			}
 
-			secret, err := settingsRepo.Get(r.Context(), "turnstile_secret_key")
-			if err != nil || secret.Value == "" {
-				// Turnstile not configured, skip verification.
+			provider := settingValue(r, settingsRepo, "captcha_provider")
+			if provider == "" {
+				provider = "turnstile"
+			}
+			if enabled := settingValue(r, settingsRepo, "captcha_enabled"); enabled == "false" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			token := r.Header.Get("X-Turnstile-Token")
+			secret := settingValue(r, settingsRepo, "captcha_secret_key")
+			if secret == "" && provider == "turnstile" {
+				secret = settingValue(r, settingsRepo, "turnstile_secret_key")
+			}
+			if secret == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			token := r.Header.Get("X-Captcha-Token")
+			if token == "" {
+				token = r.Header.Get("X-Turnstile-Token")
+			}
 			if token == "" {
 				w.Header().Set("Content-Type", "application/json; charset=utf-8")
 				w.WriteHeader(http.StatusBadRequest)
@@ -39,7 +58,7 @@ func Turnstile(settingsRepo port.SettingsRepository) func(http.Handler) http.Han
 				return
 			}
 
-			if !verifyTurnstile(r.Context(), secret.Value, token, clientIP(r)) {
+			if !verifyCaptcha(r.Context(), provider, secret, token, clientIP(r)) {
 				w.Header().Set("Content-Type", "application/json; charset=utf-8")
 				w.WriteHeader(http.StatusForbidden)
 				_, _ = w.Write([]byte(`{"success":false,"error":{"code":"captcha_failed","message":"human verification failed"}}`))
@@ -51,7 +70,20 @@ func Turnstile(settingsRepo port.SettingsRepository) func(http.Handler) http.Han
 	}
 }
 
-func verifyTurnstile(ctx context.Context, secret, token, remoteIP string) bool {
+func settingValue(r *http.Request, settingsRepo port.SettingsRepository, key string) string {
+	setting, err := settingsRepo.Get(r.Context(), key)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(setting.Value)
+}
+
+func verifyCaptcha(ctx context.Context, provider, secret, token, remoteIP string) bool {
+	verifyURL := turnstileVerifyURL
+	if provider == "hcaptcha" {
+		verifyURL = hcaptchaVerifyURL
+	}
+
 	data := url.Values{}
 	data.Set("secret", secret)
 	data.Set("response", token)
@@ -60,7 +92,7 @@ func verifyTurnstile(ctx context.Context, secret, token, remoteIP string) bool {
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Post(turnstileVerifyURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+	resp, err := client.Post(verifyURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 	if err != nil {
 		return false
 	}
@@ -72,6 +104,6 @@ func verifyTurnstile(ctx context.Context, secret, token, remoteIP string) bool {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return false
 	}
-	slog.Debug("turnstile verify", "success", result.Success)
+	slog.Debug("captcha verify", "provider", provider, "success", result.Success)
 	return result.Success
 }

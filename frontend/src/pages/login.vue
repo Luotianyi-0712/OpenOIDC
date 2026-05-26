@@ -6,7 +6,7 @@ import { Mail, Lock, Loader2, Fingerprint, Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePublicConfig, getProviderIcon, isGoogleProvider, GOOGLE_SVG } from '@/composables/usePublicConfig'
 import { useToastStore } from '@/stores/toast'
-import { useTurnstile } from '@/composables/useTurnstile'
+import { useCaptcha } from '@/composables/useCaptcha'
 import { usePasskey } from '@/composables/usePasskey'
 
 const { t } = useI18n()
@@ -17,7 +17,7 @@ const auth = useAuthStore()
 const toastStore = useToastStore()
 
 const { providers, settings, loaded } = usePublicConfig()
-const { token: turnstileToken, containerId: turnstileId, reset: resetTurnstile, renderWidget } = useTurnstile(() => settings.value.turnstile_site_key)
+const { token: captchaToken, containerId: captchaId, reset: resetCaptcha } = useCaptcha(() => settings.value.captcha_provider, () => settings.value.captcha_site_key)
 
 const email = ref('')
 const password = ref('')
@@ -65,7 +65,7 @@ async function onSubmit() {
   error.value = ''
   loading.value = true
   try {
-    await auth.login(email.value, password.value, turnstileToken.value || undefined)
+    await auth.login(email.value, password.value, captchaToken.value || undefined)
     const returnTo = safeReturnTo(route.query.return_to)
     router.push(returnTo)
   } catch (e: any) {
@@ -75,7 +75,7 @@ async function onSubmit() {
     } else {
       error.value = msg
     }
-    resetTurnstile()
+    resetCaptcha()
   } finally {
     loading.value = false
   }
@@ -193,7 +193,7 @@ async function onSubmit() {
           </button>
         </div>
       </div>
-      <div v-if="settings.turnstile_site_key" :id="turnstileId" class="flex justify-center"></div>
+      <div v-if="settings.captcha_enabled && settings.captcha_site_key" :id="captchaId" class="flex justify-center"></div>
       <button
         type="submit"
         :disabled="loading"

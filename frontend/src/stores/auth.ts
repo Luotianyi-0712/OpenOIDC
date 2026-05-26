@@ -77,24 +77,27 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function login(email: string, password: string, turnstileToken?: string) {
+  function captchaHeaders(captchaToken?: string) {
     const headers: Record<string, string> = {}
-    if (turnstileToken) headers['X-Turnstile-Token'] = turnstileToken
-    await api.post('/auth/login', { email, password }, headers)
+    if (captchaToken) {
+      headers['X-Captcha-Token'] = captchaToken
+      headers['X-Turnstile-Token'] = captchaToken
+    }
+    return headers
+  }
+
+  async function login(email: string, password: string, captchaToken?: string) {
+    await api.post('/auth/login', { email, password }, captchaHeaders(captchaToken))
     await fetchUser()
     await fetchDeveloperStatus()
   }
 
-  async function sendRegisterCode(email: string, turnstileToken?: string) {
-    const headers: Record<string, string> = {}
-    if (turnstileToken) headers['X-Turnstile-Token'] = turnstileToken
-    await api.post('/auth/register/code', { email }, headers)
+  async function sendRegisterCode(email: string, captchaToken?: string) {
+    await api.post('/auth/register/code', { email }, captchaHeaders(captchaToken))
   }
 
-  async function register(email: string, password: string, display_name: string, code: string, turnstileToken?: string) {
-    const headers: Record<string, string> = {}
-    if (turnstileToken) headers['X-Turnstile-Token'] = turnstileToken
-    await api.post('/auth/register', { email, password, display_name, code }, headers)
+  async function register(email: string, password: string, display_name: string, code: string, captchaToken?: string) {
+    await api.post('/auth/register', { email, password, display_name, code }, captchaHeaders(captchaToken))
   }
 
   async function logout() {

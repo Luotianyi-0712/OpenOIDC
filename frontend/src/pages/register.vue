@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { Mail, Lock, User, Loader2, Check, X, Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePublicConfig, getProviderIcon, isGoogleProvider, GOOGLE_SVG } from '@/composables/usePublicConfig'
-import { useTurnstile } from '@/composables/useTurnstile'
+import { useCaptcha } from '@/composables/useCaptcha'
 import { usePasswordPolicy } from '@/composables/usePasswordPolicy'
 
 const { t } = useI18n()
@@ -14,7 +14,7 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const { providers, settings, loaded } = usePublicConfig()
-const { token: turnstileToken, containerId: turnstileId, reset: resetTurnstile } = useTurnstile(() => settings.value.turnstile_site_key)
+const { token: captchaToken, containerId: captchaId, reset: resetCaptcha } = useCaptcha(() => settings.value.captcha_provider, () => settings.value.captcha_site_key)
 const { policy, hasRequirements, validate } = usePasswordPolicy()
 
 const displayName = ref('')
@@ -56,12 +56,12 @@ async function sendCode() {
   error.value = ''
   sendingCode.value = true
   try {
-    await auth.sendRegisterCode(email.value, turnstileToken.value || undefined)
+    await auth.sendRegisterCode(email.value, captchaToken.value || undefined)
     codeSent.value = true
-    resetTurnstile()
+    resetCaptcha()
   } catch (e: any) {
     error.value = e.message || t('register.sendCodeFailed')
-    resetTurnstile()
+    resetCaptcha()
   } finally {
     sendingCode.value = false
   }
@@ -79,11 +79,11 @@ async function onSubmit() {
   }
   loading.value = true
   try {
-    await auth.register(email.value, password.value, displayName.value, code.value, turnstileToken.value || undefined)
+    await auth.register(email.value, password.value, displayName.value, code.value, captchaToken.value || undefined)
     router.push('/login?registered=1')
   } catch (e: any) {
     error.value = e.message || 'Registration failed. Please try again.'
-    resetTurnstile()
+    resetCaptcha()
   } finally {
     loading.value = false
   }
@@ -261,7 +261,7 @@ async function onSubmit() {
             </div>
           </div>
         </template>
-        <div v-if="settings.turnstile_site_key" :id="turnstileId" class="flex justify-center"></div>
+        <div v-if="settings.captcha_enabled && settings.captcha_site_key" :id="captchaId" class="flex justify-center"></div>
         <button
           type="submit"
           :disabled="loading || sendingCode"

@@ -36,7 +36,6 @@ type Deps struct {
 func NewRouter(d Deps) *chi.Mux {
 	r := chi.NewRouter()
 
-	r.Use(chimw.RealIP)
 	r.Use(mw.RequestID)
 	r.Use(chimw.Recoverer)
 	r.Use(mw.RequestLogger)
@@ -50,10 +49,18 @@ func NewRouter(d Deps) *chi.Mux {
 
 	// OAuth2 / OIDC core endpoints.
 	r.Route("/oauth2", func(r chi.Router) {
+		if d.Cache != nil {
+			r.Use(mw.RateLimit(d.Cache, 120, time.Minute))
+		}
 		r.With(mw.OptionalSessionAuth(d.SessionService, d.CookieName)).Get("/authorize", d.OIDCHandler.Authorize)
-		r.Post("/token", d.OIDCHandler.Token)
+		if d.Cache != nil {
+			r.With(mw.RateLimit(d.Cache, 60, time.Minute)).Post("/token", d.OIDCHandler.Token)
+			r.With(mw.RateLimit(d.Cache, 60, time.Minute)).Post("/introspect", d.OIDCHandler.Introspect)
+		} else {
+			r.Post("/token", d.OIDCHandler.Token)
+			r.Post("/introspect", d.OIDCHandler.Introspect)
+		}
 		r.Post("/revoke", d.OIDCHandler.Revoke)
-		r.Post("/introspect", d.OIDCHandler.Introspect)
 		r.Get("/userinfo", d.OIDCHandler.UserInfo)
 		r.Post("/userinfo", d.OIDCHandler.UserInfo)
 	})
@@ -68,13 +75,12 @@ func NewRouter(d Deps) *chi.Mux {
 			if d.Cache != nil {
 				r.Use(mw.DynamicRateLimit(d.Cache, d.SettingsRepo, 30, time.Minute))
 			}
-			r.Use(mw.Turnstile(d.SettingsRepo))
-			r.Post("/register/code", d.AuthHandler.SendRegisterCode)
-			r.Post("/register", d.AuthHandler.Register)
-			r.Post("/login", d.AuthHandler.Login)
+			r.With(mw.Turnstile(d.SettingsRepo)).Post("/register/code", d.AuthHandler.SendRegisterCode)
+			r.With(mw.Turnstile(d.SettingsRepo)).Post("/register", d.AuthHandler.Register)
+			r.With(mw.Turnstile(d.SettingsRepo)).Post("/login", d.AuthHandler.Login)
 			r.Post("/logout", d.AuthHandler.Logout)
 			r.Post("/verify-email", d.AuthHandler.VerifyEmail)
-			r.Post("/forgot-password", d.AuthHandler.ForgotPassword)
+			r.With(mw.Turnstile(d.SettingsRepo)).Post("/forgot-password", d.AuthHandler.ForgotPassword)
 			r.Post("/reset-password", d.AuthHandler.ResetPassword)
 			r.Post("/passkey/begin", d.PasskeyHandler.BeginLogin)
 			r.Post("/passkey/finish", d.PasskeyHandler.FinishLogin)
@@ -85,6 +91,9 @@ func NewRouter(d Deps) *chi.Mux {
 
 		// Social - login/binding callbacks. Optional session so callback can be either.
 		r.Route("/social", func(r chi.Router) {
+			if d.Cache != nil {
+				r.Use(mw.RateLimit(d.Cache, 60, time.Minute))
+			}
 			r.Use(mw.OptionalSessionAuth(d.SessionService, d.CookieName))
 			r.Get("/{provider}/begin", d.SocialHandler.Begin)
 			r.Get("/{provider}/callback", d.SocialHandler.Callback)
@@ -123,6 +132,9 @@ func NewRouter(d Deps) *chi.Mux {
 		// creating new apps is checked by the developer status in the handler.
 		r.Route("/developer", func(r chi.Router) {
 			r.Use(mw.SessionAuth(d.SessionService, d.CookieName))
+			if d.Cache != nil {
+				r.Use(mw.RateLimit(d.Cache, 120, time.Minute))
+			}
 			r.Get("/status", d.DeveloperHandler.Status)
 			r.Get("/apps", d.DeveloperHandler.ListApps)
 			r.Post("/apps", d.DeveloperHandler.CreateApp)
