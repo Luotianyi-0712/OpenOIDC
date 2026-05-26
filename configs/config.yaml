@@ -79,6 +79,12 @@ oauth2:
     client_secret: ""
     scopes: [read:user, user:email]
     redirect_path: /oauth/callback/github
+  linuxdo:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+    scopes: [user]
+    redirect_path: /oauth/callback/linuxdo
   microsoft:
     enabled: false
     client_id: ""

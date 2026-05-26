@@ -35,6 +35,7 @@ const BOOL_SETTINGS = new Set([
 const SMTP_KEYS = ['smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_from']
 const DEDICATED_SETTING_KEYS = new Set([
   ...SMTP_KEYS,
+  'site_url',
   'allowed_email_domains',
   'turnstile_site_key',
   'turnstile_secret_key',
@@ -68,6 +69,10 @@ const editingKey = ref('')
 const saving = ref(false)
 const form = ref({ value: '', description: '' })
 const editingDescription = computed(() => tOrFallback(`adminSettings.descriptions.${editingKey.value}`, editingKey.value))
+
+// Site URL
+const siteURL = ref(window.location.origin)
+const siteSaving = ref(false)
 
 // SMTP form
 const smtpForm = ref({ host: '', port: '465', username: '', password: '', from: '' })
@@ -130,6 +135,7 @@ async function fetchSettings() {
     settings.value = res.data ?? []
     // Populate domain whitelist
     for (const s of settings.value) {
+      if (s.key === 'site_url') siteURL.value = s.value || window.location.origin
       if (s.key === 'smtp_host') smtpForm.value.host = s.value
       if (s.key === 'smtp_port') smtpForm.value.port = s.value || '465'
       if (s.key === 'smtp_username') smtpForm.value.username = s.value
@@ -164,6 +170,26 @@ async function saveSetting() {
     error.value = e.message
   } finally {
     saving.value = false
+  }
+}
+
+async function saveSiteURL() {
+  siteSaving.value = true
+  error.value = ''
+  success.value = ''
+  try {
+    await api.put('/admin/settings/site_url', {
+      value: siteURL.value,
+      description: 'Public site URL for documentation examples and public callback displays',
+    })
+    await fetchSettings()
+    await auth.fetchPublicSettings()
+    success.value = t('adminSettings.siteSaved')
+    setTimeout(() => (success.value = ''), 3000)
+  } catch (e: any) {
+    error.value = e.message
+  } finally {
+    siteSaving.value = false
   }
 }
 
@@ -295,6 +321,26 @@ async function deleteAlias(id: string) {
     </div>
 
     <template v-else>
+      <!-- Site URL -->
+      <div class="border border-border rounded-xl p-6 mb-8">
+        <h3 class="text-base font-semibold mb-2">{{ $t('adminSettings.siteTitle') }}</h3>
+        <p class="text-sm text-muted-foreground mb-4">{{ $t('adminSettings.siteDesc') }}</p>
+        <form @submit.prevent="saveSiteURL" class="flex flex-col gap-3">
+          <div>
+            <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.siteURL') }}</label>
+            <input v-model="siteURL" type="url" :placeholder="$t('adminSettings.siteURLPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+            <p class="text-xs text-muted-foreground mt-1">{{ $t('adminSettings.siteURLHint') }}</p>
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" :disabled="siteSaving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+              <Loader2 v-if="siteSaving" class="w-4 h-4 animate-spin" />
+              <Save v-else class="w-4 h-4" />
+              {{ $t('adminSettings.siteSave') }}
+            </button>
+          </div>
+        </form>
+      </div>
+
       <!-- General Settings -->
       <div class="border border-border rounded-xl overflow-hidden mb-8">
         <table class="w-full text-sm">

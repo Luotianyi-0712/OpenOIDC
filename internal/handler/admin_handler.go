@@ -1123,6 +1123,7 @@ func (h *AdminHandler) DeleteAliasRestriction(w http.ResponseWriter, r *http.Req
 // PublicSettings returns login/registration settings without requiring auth.
 func (h *AdminHandler) PublicSettings(w http.ResponseWriter, r *http.Request) {
 	keys := []string{
+		"site_url",
 		"registration_enabled",
 		"registration_email_verification_required",
 		"password_login_enabled",
@@ -1136,7 +1137,7 @@ func (h *AdminHandler) PublicSettings(w http.ResponseWriter, r *http.Request) {
 	for _, key := range keys {
 		setting, err := h.adminSvc.GetSetting(r.Context(), key)
 		if err != nil {
-			if key == "turnstile_site_key" || key == "developer_min_trust_level" {
+			if key == "site_url" || key == "turnstile_site_key" || key == "developer_min_trust_level" {
 				result[key] = ""
 			} else {
 				result[key] = "true"
@@ -1192,6 +1193,16 @@ func (h *AdminHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	if uid := q.Get("user_id"); uid != "" {
 		if id, err := uuid.Parse(uid); err == nil {
+			opts.UserID = &id
+		} else if numericUID, err := strconv.ParseInt(uid, 10, 64); err == nil && numericUID > 0 {
+			if user, err := h.userRepo.GetByUID(r.Context(), numericUID); err == nil {
+				opts.UserID = &user.ID
+			} else {
+				id := uuid.Nil
+				opts.UserID = &id
+			}
+		} else {
+			id := uuid.Nil
 			opts.UserID = &id
 		}
 	}

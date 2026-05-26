@@ -129,6 +129,17 @@ export const providerMeta: Record<string, ProviderMeta> = {
     ],
     callbackPath: '/api/v1/social/gitee/callback',
   },
+  linuxdo: {
+    label: 'Linux DO Connect',
+    color: '#1f2937',
+    icon: '',
+    fields: [
+      { key: 'client_id', label: 'Client ID', type: 'text' },
+      { key: 'client_secret', label: 'Client Secret', type: 'password' },
+    ],
+    callbackPath: '/api/v1/social/linuxdo/callback',
+    docUrl: 'https://connect.linux.do',
+  },
   discord: {
     label: 'Discord',
     color: '#5865f2',

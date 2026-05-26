@@ -21,10 +21,11 @@ type DeveloperHandler struct {
 	userRepo     port.UserRepository
 	settingsRepo port.SettingsRepository
 	consentRepo  port.ConsentRepository
+	oidcIssuer   string
 }
 
-func NewDeveloperHandler(clientSvc *service.ClientService, riskSvc *service.RiskService, userRepo port.UserRepository, settingsRepo port.SettingsRepository, consentRepo port.ConsentRepository) *DeveloperHandler {
-	return &DeveloperHandler{clientSvc: clientSvc, riskSvc: riskSvc, userRepo: userRepo, settingsRepo: settingsRepo, consentRepo: consentRepo}
+func NewDeveloperHandler(clientSvc *service.ClientService, riskSvc *service.RiskService, userRepo port.UserRepository, settingsRepo port.SettingsRepository, consentRepo port.ConsentRepository, oidcIssuer string) *DeveloperHandler {
+	return &DeveloperHandler{clientSvc: clientSvc, riskSvc: riskSvc, userRepo: userRepo, settingsRepo: settingsRepo, consentRepo: consentRepo, oidcIssuer: strings.TrimRight(strings.TrimSpace(oidcIssuer), "/")}
 }
 
 func (h *DeveloperHandler) Status(w http.ResponseWriter, r *http.Request) {
@@ -151,15 +152,16 @@ func (h *DeveloperHandler) GetApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	issuer := h.getIssuer(r.Context())
+	baseURL := h.getPublicBaseURL(r)
+	issuer := h.getIssuer(r)
 	payload := devClientPayload(client)
 	payload["endpoints"] = map[string]string{
-		"authorize_url": issuer + "/oauth2/authorize",
-		"token_url":     issuer + "/oauth2/token",
-		"userinfo_url":  issuer + "/oauth2/userinfo",
-		"jwks_url":      issuer + "/jwks.json",
+		"authorize_url": baseURL + "/oauth2/authorize",
+		"token_url":     baseURL + "/oauth2/token",
+		"userinfo_url":  baseURL + "/oauth2/userinfo",
+		"jwks_url":      baseURL + "/jwks.json",
 		"issuer":        issuer,
-		"discovery_url": issuer + "/.well-known/openid-configuration",
+		"discovery_url": baseURL + "/.well-known/openid-configuration",
 	}
 	// Add user count (number of unique users who have authorized this app).
 	if h.consentRepo != nil {
@@ -502,13 +504,39 @@ func (h *DeveloperHandler) reportAppUser(w http.ResponseWriter, r *http.Request,
 	JSON(w, http.StatusCreated, report)
 }
 
-// getIssuer reads the "issuer" setting from the settings repo, with a sensible fallback.
-func (h *DeveloperHandler) getIssuer(ctx context.Context) string {
-	setting, err := h.settingsRepo.Get(ctx, "issuer")
-	if err == nil && setting != nil && strings.TrimSpace(setting.Value) != "" {
-		return strings.TrimRight(setting.Value, "/")
+// getPublicBaseURL reads the public display base URL without changing the OIDC token issuer.
+func (h *DeveloperHandler) getPublicBaseURL(r *http.Request) string {
+	if h.settingsRepo != nil {
+		setting, err := h.settingsRepo.Get(r.Context(), "site_url")
+		if err == nil && setting != nil && strings.TrimSpace(setting.Value) != "" {
+			return strings.TrimRight(strings.TrimSpace(setting.Value), "/")
+		}
+	}
+	if r != nil {
+		scheme := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))
+		if scheme == "" {
+			if r.TLS != nil {
+				scheme = "https"
+			} else {
+				scheme = "http"
+			}
+		}
+		host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+		if host == "" {
+			host = strings.TrimSpace(r.Host)
+		}
+		if host != "" {
+			return strings.TrimRight(scheme+"://"+host, "/")
+		}
 	}
 	return "http://localhost:8080"
+}
+
+func (h *DeveloperHandler) getIssuer(r *http.Request) string {
+	if h.oidcIssuer != "" {
+		return h.oidcIssuer
+	}
+	return h.getPublicBaseURL(r)
 }
 
 func (h *DeveloperHandler) developerStatus(ctx context.Context, userID uuid.UUID) (map[string]any, error) {

@@ -482,10 +482,33 @@ func (s *AdminService) GetSetting(ctx context.Context, key string) (*domain.Glob
 }
 
 func (s *AdminService) UpdateSetting(ctx context.Context, key, value, desc string) error {
+	key = strings.TrimSpace(key)
 	if key == "" {
 		return fmt.Errorf("%w: key required", ErrInvalidInput)
 	}
+	if key == "site_url" {
+		normalized, err := normalizeSiteURL(value)
+		if err != nil {
+			return err
+		}
+		value = normalized
+	}
 	return s.settingsRepo.Upsert(ctx, key, value, desc)
+}
+
+func normalizeSiteURL(value string) (string, error) {
+	value = strings.TrimRight(strings.TrimSpace(value), "/")
+	if value == "" {
+		return "", fmt.Errorf("%w: site_url is required", ErrInvalidInput)
+	}
+	u, err := url.Parse(value)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", fmt.Errorf("%w: site_url must be a valid URL", ErrInvalidInput)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("%w: site_url must use http or https", ErrInvalidInput)
+	}
+	return value, nil
 }
 
 func (s *AdminService) ListSettings(ctx context.Context) ([]*domain.GlobalSetting, error) {

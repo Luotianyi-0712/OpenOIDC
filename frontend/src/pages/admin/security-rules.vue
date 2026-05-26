@@ -88,7 +88,7 @@ const deleting = ref(false)
 const recomputing = ref(false)
 
 const providerOptions = [
-  'github', 'google', 'gitlab', 'gitee', 'discord',
+  'github', 'google', 'gitlab', 'gitee', 'linuxdo', 'discord',
   'telegram', 'microsoft', 'apple', 'qq', 'wechat', 'phone',
 ]
 
@@ -110,9 +110,12 @@ const numberOperators = ['gte', 'gt', 'lte', 'lt', 'eq', 'neq']
 const stringOperators = ['eq', 'neq', 'contains', 'prefix', 'suffix', 'regex', 'in']
 const boolOperators = ['eq', 'neq']
 
+const emailDomainField: FieldOption = { value: 'email_domain', labelKey: 'emailDomain', type: 'string' }
+const emailVerifiedField: FieldOption = { value: 'email_verified', labelKey: 'emailVerified', type: 'bool' }
+
 const commonProviderFields: FieldOption[] = [
-  { value: 'email_domain', labelKey: 'emailDomain', type: 'string' },
-  { value: 'email_verified', labelKey: 'emailVerified', type: 'bool' },
+  emailDomainField,
+  emailVerifiedField,
 ]
 
 const providerFields: Record<string, FieldOption[]> = {
@@ -125,31 +128,60 @@ const providerFields: Record<string, FieldOption[]> = {
     ...commonProviderFields,
   ],
   google: [
-    { value: 'email_verified', labelKey: 'emailVerified', type: 'bool' },
-    { value: 'email_domain', labelKey: 'emailDomain', type: 'string' },
+    emailVerifiedField,
+    emailDomainField,
     { value: 'hd', labelKey: 'googleHostedDomain', type: 'string' },
   ],
   discord: [
-    { value: 'email_verified', labelKey: 'emailVerified', type: 'bool' },
+    emailVerifiedField,
+    emailDomainField,
     { value: 'mfa_enabled', labelKey: 'discordMfaEnabled', type: 'bool' },
     { value: 'public_flags', labelKey: 'discordPublicFlags', type: 'number' },
   ],
   gitlab: [
     { value: 'created_at', labelKey: 'createdAt', type: 'time' },
+    { value: 'username', labelKey: 'username', type: 'string' },
     ...commonProviderFields,
   ],
   gitee: [
     { value: 'created_at', labelKey: 'createdAt', type: 'time' },
+    { value: 'login', labelKey: 'username', type: 'string' },
+    { value: 'name', labelKey: 'displayName', type: 'string' },
+    emailDomainField,
+  ],
+  linuxdo: [
+    { value: 'username', labelKey: 'username', type: 'string' },
+    { value: 'name', labelKey: 'displayName', type: 'string' },
     ...commonProviderFields,
   ],
   microsoft: [
-    { value: 'email_domain', labelKey: 'emailDomain', type: 'string' },
+    emailDomainField,
     { value: 'tenant', labelKey: 'microsoftTenant', type: 'string' },
     { value: 'tid', labelKey: 'microsoftTenantId', type: 'string' },
+    { value: 'userPrincipalName', labelKey: 'microsoftUserPrincipalName', type: 'string' },
   ],
   apple: [
-    { value: 'email_verified', labelKey: 'emailVerified', type: 'bool' },
-    { value: 'email_domain', labelKey: 'emailDomain', type: 'string' },
+    emailVerifiedField,
+    emailDomainField,
+  ],
+  telegram: [
+    { value: 'username', labelKey: 'username', type: 'string' },
+    { value: 'first_name', labelKey: 'firstName', type: 'string' },
+    { value: 'last_name', labelKey: 'lastName', type: 'string' },
+    { value: 'auth_date', labelKey: 'telegramAuthDate', type: 'number' },
+  ],
+  qq: [
+    { value: 'nickname', labelKey: 'nickname', type: 'string' },
+  ],
+  wechat: [
+    { value: 'nickname', labelKey: 'nickname', type: 'string' },
+    { value: 'country', labelKey: 'country', type: 'string' },
+    { value: 'province', labelKey: 'province', type: 'string' },
+    { value: 'city', labelKey: 'city', type: 'string' },
+    { value: 'sex', labelKey: 'wechatSex', type: 'number' },
+  ],
+  phone: [
+    { value: 'phone_number', labelKey: 'phoneNumber', type: 'string' },
   ],
 }
 

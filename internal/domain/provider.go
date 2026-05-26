@@ -12,6 +12,7 @@ const (
 	ProviderGoogle    = "google"
 	ProviderGitLab    = "gitlab"
 	ProviderGitee     = "gitee"
+	ProviderLinuxDO   = "linuxdo"
 	ProviderDiscord   = "discord"
 	ProviderTelegram  = "telegram"
 	ProviderMicrosoft = "microsoft"
@@ -30,6 +31,7 @@ func AllProviders() []string {
 		ProviderGoogle,
 		ProviderGitLab,
 		ProviderGitee,
+		ProviderLinuxDO,
 		ProviderDiscord,
 		ProviderTelegram,
 		ProviderMicrosoft,

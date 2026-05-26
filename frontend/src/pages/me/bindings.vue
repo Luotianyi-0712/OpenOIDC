@@ -192,7 +192,7 @@ function formatDate(iso: string) {
                   class="w-5 h-5 object-contain"
                 />
                 <span v-else-if="isGoogleProvider(item.id)" v-html="GOOGLE_SVG" />
-                <svg v-else-if="getProviderIcon(item.id)" class="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <svg v-else-if="getProviderIcon(item.id)?.path" class="w-5 h-5" viewBox="0 0 24 24" fill="none">
                   <path :d="getProviderIcon(item.id)!.path" :fill="getProviderIcon(item.id)!.color" />
                 </svg>
                 <span v-else class="text-sm font-semibold text-muted-foreground">
@@ -241,7 +241,7 @@ function formatDate(iso: string) {
                 class="w-5 h-5 object-contain"
               />
               <span v-else-if="isGoogleProvider(provider.id)" v-html="GOOGLE_SVG" />
-              <svg v-else-if="getProviderIcon(provider.id)" class="w-5 h-5" viewBox="0 0 24 24" fill="none">
+              <svg v-else-if="getProviderIcon(provider.id)?.path" class="w-5 h-5" viewBox="0 0 24 24" fill="none">
                 <path :d="getProviderIcon(provider.id)!.path" :fill="getProviderIcon(provider.id)!.color" />
               </svg>
               <span v-else class="text-sm font-semibold text-muted-foreground">

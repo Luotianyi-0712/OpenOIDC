@@ -194,7 +194,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	oidcHandler := handler.NewOIDCHandler(provider, userRepo, clientSvc, accessCtrl, sessionSvc, cfg.Server, loginURL)
 	oidcHandler.SetCache(cache)
 	wellKnownHandler := handler.NewWellKnownHandler(cfg.Server.BaseURL, signingKeyRepo)
-	devHandler := handler.NewDeveloperHandler(clientSvc, riskSvc, userRepo, settingsRepo, consentRepo)
+	devHandler := handler.NewDeveloperHandler(clientSvc, riskSvc, userRepo, settingsRepo, consentRepo, cfg.Server.Issuer)
 	healthHandler := handler.NewHealthHandler(pgPool, redisClient)
 	passkeyHandler := handler.NewPasskeyHandler(passkeySvc, cfg.Session)
 
@@ -212,7 +212,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	}
 
 	seedProviders(ctx, providerCfgRepo)
-	seedSettings(ctx, settingsRepo)
+	seedSettings(ctx, settingsRepo, cfg)
 
 	return router.Deps{
 		AuthHandler:      authHandler,
@@ -271,6 +271,8 @@ func buildSocialRegistry(cfg *config.Config, providerCfgRepo port.ProviderConfig
 			p = social.NewGitLabProvider(pcfg.ClientID, pcfg.ClientSecret, "")
 		case domain.ProviderGitee:
 			p = social.NewGiteeProvider(pcfg.ClientID, pcfg.ClientSecret)
+		case domain.ProviderLinuxDO:
+			p = social.NewLinuxDOProvider(pcfg.ClientID, pcfg.ClientSecret)
 		case domain.ProviderDiscord:
 			p = social.NewDiscordProvider(pcfg.ClientID, pcfg.ClientSecret)
 		case domain.ProviderMicrosoft:
@@ -371,6 +373,7 @@ func seedProviders(ctx context.Context, repo port.ProviderConfigRepository) {
 		domain.ProviderGoogle:    "Google",
 		domain.ProviderGitLab:    "GitLab",
 		domain.ProviderGitee:     "Gitee",
+		domain.ProviderLinuxDO:   "Linux DO Connect",
 		domain.ProviderDiscord:   "Discord",
 		domain.ProviderTelegram:  "Telegram",
 		domain.ProviderMicrosoft: "Microsoft",
@@ -405,9 +408,10 @@ func seedProviders(ctx context.Context, repo port.ProviderConfigRepository) {
 	}
 }
 
-func seedSettings(ctx context.Context, repo port.SettingsRepository) {
+func seedSettings(ctx context.Context, repo port.SettingsRepository, cfg *config.Config) {
 	defaults := map[string]string{
-		"registration_enabled":                     "true",
+		"site_url":             defaultSiteURL(cfg),
+		"registration_enabled": "true",
 		"registration_email_verification_required": "true",
 		"password_login_enabled":                   "true",
 		"social_login_enabled":                     "true",
@@ -423,6 +427,15 @@ func seedSettings(ctx context.Context, repo port.SettingsRepository) {
 			}
 		}
 	}
+}
+
+func defaultSiteURL(cfg *config.Config) string {
+	for _, candidate := range []string{cfg.Server.BaseURL, cfg.Server.Issuer} {
+		if value := strings.TrimRight(strings.TrimSpace(candidate), "/"); value != "" {
+			return value
+		}
+	}
+	return fmt.Sprintf("http://localhost:%d", cfg.Server.Port)
 }
 
 func startBackgroundJobs(ctx context.Context, sessionRepo port.SessionRepository, securitySvc *service.SecurityLevelService, socialSvc *service.SocialService, socialSync config.SocialAuthSyncConfig) {

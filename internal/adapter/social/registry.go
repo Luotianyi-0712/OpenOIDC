@@ -161,6 +161,8 @@ func buildProvider(name, clientID, clientSecret string, extra map[string]any) po
 		return NewGitLabProvider(clientID, clientSecret, baseURL)
 	case domain.ProviderGitee:
 		return NewGiteeProvider(clientID, clientSecret)
+	case domain.ProviderLinuxDO:
+		return NewLinuxDOProvider(clientID, clientSecret)
 	case domain.ProviderDiscord:
 		return NewDiscordProvider(clientID, clientSecret)
 	case domain.ProviderMicrosoft:
@@ -244,6 +246,8 @@ func providerDisplayName(name string) string {
 		return "GitLab"
 	case domain.ProviderGitee:
 		return "Gitee"
+	case domain.ProviderLinuxDO:
+		return "Linux DO Connect"
 	case domain.ProviderDiscord:
 		return "Discord"
 	case domain.ProviderTelegram:

@@ -27,7 +27,7 @@ const configuredLabel = computed(() => {
 })
 
 const providerHint = computed(() => props.provider.client_id || props.provider.app_id || props.provider.provider)
-const hasIconImage = computed(() => props.isCustom && !!props.provider.icon_url)
+const hasIconImage = computed(() => !!props.provider.icon_url)
 </script>
 
 <template>

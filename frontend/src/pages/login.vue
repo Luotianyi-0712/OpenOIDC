@@ -115,10 +115,19 @@ async function onSubmit() {
         class="w-full border border-border rounded-lg py-2.5 px-4 text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2.5"
         @click="socialLogin(p.name)"
       >
-        <span v-if="isGoogleProvider(p.name)" v-html="GOOGLE_SVG" />
-        <svg v-else-if="getProviderIcon(p.name)" class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none">
+        <img
+          v-if="p.icon_url"
+          :src="p.icon_url"
+          :alt="p.display_name"
+          class="w-[18px] h-[18px] object-contain"
+        />
+        <span v-else-if="isGoogleProvider(p.name)" v-html="GOOGLE_SVG" />
+        <svg v-else-if="getProviderIcon(p.name)?.path" class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none">
           <path :d="getProviderIcon(p.name)!.path" :fill="getProviderIcon(p.name)!.color" />
         </svg>
+        <span v-else class="text-xs font-semibold text-muted-foreground">
+          {{ p.display_name.slice(0, 1).toUpperCase() }}
+        </span>
         {{ p.display_name }}
       </button>
     </div>
