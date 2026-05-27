@@ -48,28 +48,28 @@ Beyond standard OIDC, the platform offers a "bind once, sign in everywhere" expe
 
 ## Supported Bindings
 
-| Region  | Providers                                                            |
-| ------- | -------------------------------------------------------------------- |
-| Global  | Google, GitHub, GitLab, Microsoft, Apple, Discord, Telegram          |
-| China   | Gitee, QQ, WeChat                                                    |
-| Generic | Email, phone (SMS), TOTP / MFA                                       |
+| Region / type | Providers |
+| ------------- | --------- |
+| Global        | Google, GitHub, GitLab, Microsoft, Apple, Discord, Telegram |
+| China         | Gitee, QQ, WeChat, Linux DO |
+| Generic       | Email, phone (SMS), TOTP / MFA, Passkey |
 
 > Each provider is pluggable; enable / disable and configure credentials independently in the admin console.
 
 ## Feature Modules
 
-- **User account center** — email register / login, password recovery, email verification, third-party binding & unbinding, session management, authorized apps, trust-level view, TOTP / MFA.
-- **Developer portal** — self-service app creation, redirect URI and secret management, access-rule configuration, integration metrics.
-- **Admin console** — users, clients, social providers, signing-key rotation, audit log, risk rules, security rules, system settings, alias / allowlist / email-domain restrictions.
+- **User account center** — email register / login, password recovery, email verification, third-party binding & unbinding, session management, authorized apps, recent activity, trust-level view, TOTP / MFA, and Passkey management.
+- **Developer portal** — self-service app creation, redirect URI and secret management, access-rule configuration, authorized-user management, user blocking, and abuse reporting.
+- **Admin console** — users, clients, authorized users, social providers, per-provider login/register toggles, signing-key rotation, audit log, risk policy, risk list, security rules, system settings, version/update check, alias / allowlist / email-domain restrictions.
 - **OIDC / OAuth server** — built on [ory/fosite](https://github.com/ory/fosite); ships `/.well-known/openid-configuration`, `/authorize`, `/token`, `/userinfo`, `/jwks.json`.
-- **Risk & security** — login lockout, Cloudflare Turnstile, rate limiting, request audit, password policy, periodic key rotation.
+- **Risk & security** — login lockout, Cloudflare Turnstile / hCaptcha captcha support, platform risk blocking, rate limiting, request audit, password policy, Passkeys, periodic key rotation.
 
 ## Tech Stack
 
 - **Backend** — Go 1.23+, [chi](https://github.com/go-chi/chi) router, [ory/fosite](https://github.com/ory/fosite), [viper](https://github.com/spf13/viper), pgx / modernc.org/sqlite.
 - **Storage** — SQLite (default, zero-dep single file) or PostgreSQL + Redis (production).
 - **Frontend** — Vue 3 + Vite + TypeScript + Pinia. One bundle hosts the user center, developer portal, and admin console.
-- **Deployment** — single binary + frontend dist, or docker compose for Postgres + Redis + app.
+- **Deployment** — recommended Docker image deployment from GHCR, plus single binary + frontend dist for manual/local use.
 
 ## Repository Layout
 
@@ -164,13 +164,17 @@ sqlc generate
 
 - [x] Email register / login / recovery
 - [x] OIDC / OAuth 2.0 standard endpoints
-- [x] GitHub / Google / GitLab / Gitee / Microsoft / Discord / Apple / Telegram / QQ / WeChat / phone bindings
+- [x] GitHub / Google / GitLab / Gitee / Linux DO / Microsoft / Discord / Apple / Telegram / QQ / WeChat / phone bindings
 - [x] Multi-level trust model
 - [x] Per-app access rule (min level + required bindings + extra conditions)
 - [x] Alias / email-domain / IP / region restrictions
-- [x] Abuse reporting and shared risk list
-- [ ] Cross-app one-tap login polish
-- [ ] WebAuthn / Passkey
+- [x] Abuse reporting, admin review, and shared risk list
+- [x] Platform risk policy and blocking controls
+- [x] Cloudflare Turnstile / hCaptcha captcha support
+- [x] WebAuthn / Passkey management
+- [x] User activity history and admin audit trails
+- [x] Version display and release update check
+- [x] Docker image workflow and GHCR deployment path
 - [ ] Multi-tenant isolation
 - [ ] SDKs: Go / Node / Python integration samples
 
