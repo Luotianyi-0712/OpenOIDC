@@ -61,8 +61,6 @@ services:
       OIDC_SESSION_COOKIE_SECURE: "${OIDC_SESSION_COOKIE_SECURE:-false}"
       OIDC_LOG_LEVEL: "${OIDC_LOG_LEVEL:-info}"
       OIDC_LOG_FORMAT: "${OIDC_LOG_FORMAT:-json}"
-    volumes:
-      - ./configs:/app/configs:ro
 
 volumes:
   postgres_data:

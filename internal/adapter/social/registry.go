@@ -144,7 +144,7 @@ func (r *Registry) Reload(ctx context.Context) error {
 		if cfg.ClientSecret != nil {
 			secret = *cfg.ClientSecret
 		}
-		p := buildProvider(cfg.Provider, *cfg.ClientID, secret, cfg.ExtraConfig)
+		p := buildProvider(cfg, *cfg.ClientID, secret)
 		if p != nil {
 			r.providers[cfg.Provider] = p
 			r.publicProviders[cfg.Provider] = providerPublicInfo(cfg)
@@ -153,13 +153,9 @@ func (r *Registry) Reload(ctx context.Context) error {
 	return nil
 }
 
-func buildProvider(name, clientID, clientSecret string, extra map[string]any) port.SocialProvider {
-	cfg := &domain.ProviderConfig{
-		Provider:     name,
-		ClientID:     &clientID,
-		ClientSecret: &clientSecret,
-		ExtraConfig:  extra,
-	}
+func buildProvider(cfg *domain.ProviderConfig, clientID, clientSecret string) port.SocialProvider {
+	name := cfg.Provider
+	extra := cfg.ExtraConfig
 	if domain.IsCustomOAuth2Provider(cfg) {
 		return NewCustomOAuth2Provider(name, clientID, clientSecret, cfg.CustomOAuth2Config())
 	}

@@ -945,6 +945,7 @@ type updateProviderRequest struct {
 	UserInfoURL           *string  `json:"userinfo_url"`
 	UserInfoEndpoint      *string  `json:"userinfo_endpoint"`
 	Scopes                []string `json:"scopes"`
+	RedirectPath          *string  `json:"redirect_path"`
 	UserIDPath            *string  `json:"user_id_path"`
 	UserIDField           *string  `json:"user_id_field"`
 	EmailPath             *string  `json:"email_path"`
@@ -1139,8 +1140,12 @@ func applyProviderRequest(pc *domain.ProviderConfig, req updateProviderRequest) 
 	if req.IconURL != nil {
 		setProviderExtra(pc, "icon_url", *req.IconURL)
 	}
+	if req.RedirectPath != nil {
+		pc.RedirectPath = strings.TrimSpace(*req.RedirectPath)
+	}
 	if req.Scopes != nil {
-		setProviderExtra(pc, "scopes", cleanProviderStringSlice(req.Scopes))
+		pc.Scopes = cleanProviderStringSlice(req.Scopes)
+		setProviderExtra(pc, "scopes", pc.Scopes)
 	}
 }
 
@@ -1236,11 +1241,19 @@ func providerPayload(pc *domain.ProviderConfig) map[string]any {
 			m["avatar_field"] = avatarField
 			m["avatar_path"] = avatarField
 		}
-		if scopes := providerExtraStringSlice(pc.ExtraConfig, "scopes"); len(scopes) > 0 {
-			m["scopes"] = scopes
+		if len(pc.Scopes) == 0 {
+			if scopes := providerExtraStringSlice(pc.ExtraConfig, "scopes"); len(scopes) > 0 {
+				m["scopes"] = scopes
+			}
 		}
 		m["has_app_secret"] = providerExtraString(pc.ExtraConfig, "app_secret") != ""
 		m["has_private_key"] = providerExtraString(pc.ExtraConfig, "private_key") != ""
+	}
+	if len(pc.Scopes) > 0 {
+		m["scopes"] = pc.Scopes
+	}
+	if pc.RedirectPath != "" {
+		m["redirect_path"] = pc.RedirectPath
 	}
 	return m
 }

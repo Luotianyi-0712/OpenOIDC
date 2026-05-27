@@ -87,6 +87,8 @@ type ProviderConfig struct {
 	IsEnabled    bool           `json:"is_enabled"`
 	ClientID     *string        `json:"client_id,omitempty"`
 	ClientSecret *string        `json:"-"`
+	Scopes       []string       `json:"scopes,omitempty"`
+	RedirectPath string         `json:"redirect_path,omitempty"`
 	ExtraConfig  map[string]any `json:"extra_config,omitempty"`
 	SortOrder    int            `json:"sort_order"`
 	CreatedAt    time.Time      `json:"created_at"`
@@ -133,13 +135,19 @@ func (pc *ProviderConfig) CustomOAuth2Config() CustomOAuth2Config {
 		NamePath:   "name",
 		AvatarPath: "avatar_url",
 	}
-	if pc == nil || pc.ExtraConfig == nil {
+	if pc == nil {
+		return cfg
+	}
+	cfg.Scopes = cleanStringSlice(pc.Scopes)
+	if pc.ExtraConfig == nil {
 		return cfg
 	}
 	cfg.AuthURL = firstExtraString(pc.ExtraConfig, "authorization_endpoint", "auth_url")
 	cfg.TokenURL = firstExtraString(pc.ExtraConfig, "token_endpoint", "token_url")
 	cfg.UserURL = firstExtraString(pc.ExtraConfig, "userinfo_endpoint", "userinfo_url", "user_url")
-	cfg.Scopes = extraStringSlice(pc.ExtraConfig, "scopes")
+	if len(cfg.Scopes) == 0 {
+		cfg.Scopes = extraStringSlice(pc.ExtraConfig, "scopes")
+	}
 	if v := firstExtraString(pc.ExtraConfig, "user_id_field", "user_id_path"); v != "" {
 		cfg.IDPath = v
 	}

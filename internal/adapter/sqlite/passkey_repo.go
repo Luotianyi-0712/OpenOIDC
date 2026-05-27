@@ -31,6 +31,9 @@ func (r *PasskeyRepo) Create(ctx context.Context, cred *domain.PasskeyCredential
 	if cred.Transport == nil {
 		cred.Transport = []string{}
 	}
+	if cred.AttestationType == "" {
+		cred.AttestationType = "none"
+	}
 	transportJSON, _ := json.Marshal(cred.Transport)
 	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO passkey_credentials

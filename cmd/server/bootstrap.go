@@ -113,7 +113,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 			migrationsPath = "db/migrations"
 		}
 		if err := postgres.RunMigrations(cfg.Database, migrationsPath); err != nil {
-			slog.Warn("run migrations", "path", migrationsPath, "error", err)
+			return router.Deps{}, cleanup, fmt.Errorf("postgres migrations %q: %w", migrationsPath, err)
 		}
 
 		redisCache, err := redis.NewCache(ctx, cfg.Redis)
