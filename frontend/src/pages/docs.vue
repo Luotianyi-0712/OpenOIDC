@@ -349,14 +349,16 @@ function scrollTo(id: string) {
             <div class="px-5 py-3 border-b border-border bg-muted/40">
               <h2 class="text-sm font-semibold">{{ $t('docs.userFieldsTitle') }}</h2>
             </div>
-            <table class="w-full text-sm">
-              <tbody class="divide-y divide-border">
-                <tr v-for="row in claimRows" :key="row.field">
-                  <td class="px-5 py-3 font-mono text-xs font-semibold whitespace-nowrap">{{ row.field }}</td>
-                  <td class="px-5 py-3 text-xs text-muted-foreground">{{ row.desc }}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[520px] text-sm">
+                <tbody class="divide-y divide-border">
+                  <tr v-for="row in claimRows" :key="row.field">
+                    <td class="px-5 py-3 font-mono text-xs font-semibold whitespace-nowrap">{{ row.field }}</td>
+                    <td class="px-5 py-3 text-xs text-muted-foreground">{{ row.desc }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div class="mt-6">

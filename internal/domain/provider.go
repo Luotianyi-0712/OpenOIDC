@@ -86,7 +86,7 @@ type ProviderConfig struct {
 	DisplayName  string         `json:"display_name"`
 	IsEnabled    bool           `json:"is_enabled"`
 	ClientID     *string        `json:"client_id,omitempty"`
-	ClientSecret *string        `json:"client_secret,omitempty"`
+	ClientSecret *string        `json:"-"`
 	ExtraConfig  map[string]any `json:"extra_config,omitempty"`
 	SortOrder    int            `json:"sort_order"`
 	CreatedAt    time.Time      `json:"created_at"`

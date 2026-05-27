@@ -456,12 +456,12 @@ function roleLabel(role?: string) {
 
 <template>
   <div>
-    <div class="flex items-start justify-between gap-4 mb-6">
+    <div class="flex flex-col gap-4 mb-6 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h2 class="text-lg font-semibold">{{ $t('adminUsers.title') }}</h2>
         <p class="text-sm text-muted-foreground mt-1">{{ $t('adminUsers.subtitle') }}</p>
       </div>
-      <button @click="openCreate" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center gap-2">
+      <button @click="openCreate" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto">
         <Plus class="w-4 h-4" /> {{ $t('adminUsers.createUser') }}
       </button>
     </div>
@@ -470,12 +470,12 @@ function roleLabel(role?: string) {
       {{ $t('adminUsers.pageHint') }}
     </div>
 
-    <div class="flex items-center gap-3 mb-4">
-      <div class="relative">
+    <div class="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center">
+      <div class="relative w-full sm:w-64">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        <input v-model="search" type="text" :placeholder="$t('adminUsers.searchPlaceholder')" class="pl-9 pr-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10 w-64" />
+        <input v-model="search" type="text" :placeholder="$t('adminUsers.searchPlaceholder')" class="w-full pl-9 pr-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
       </div>
-      <select v-model="statusFilter" class="px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10">
+      <select v-model="statusFilter" class="w-full sm:w-auto px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10">
         <option value="">{{ $t('adminUsers.allStatuses') }}</option>
         <option value="active">{{ $t('adminUsers.active') }}</option>
         <option value="suspended">{{ $t('adminUsers.suspended') }}</option>
@@ -510,9 +510,9 @@ function roleLabel(role?: string) {
           </tr>
           <tr v-for="user in users" :key="user.id" class="hover:bg-muted/30 transition-colors">
             <td class="px-4 py-3">
-              <div class="font-medium">{{ user.email }}</div>
+              <div class="font-medium break-all">{{ user.email }}</div>
               <div class="text-xs text-muted-foreground font-mono mt-0.5">{{ $t('adminUsers.uid') }} {{ user.uid }}</div>
-              <div class="text-xs text-muted-foreground">{{ user.display_name || $t('adminUsers.noDisplayName') }} · {{ user.email_verified ? $t('adminUsers.emailVerified') : $t('adminUsers.emailUnverified') }}</div>
+              <div class="text-xs text-muted-foreground break-words">{{ user.display_name || $t('adminUsers.noDisplayName') }} · {{ user.email_verified ? $t('adminUsers.emailVerified') : $t('adminUsers.emailUnverified') }}</div>
             </td>
             <td class="px-4 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="{ 'bg-green-50 text-green-700': user.status === 'active', 'bg-yellow-50 text-yellow-700': user.status === 'suspended', 'bg-red-50 text-red-700': user.status === 'deleted' }">
@@ -551,7 +551,7 @@ function roleLabel(role?: string) {
       </table>
     </div>
 
-    <div v-if="total > 0" class="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+    <div v-if="total > 0" class="flex flex-col gap-3 mt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
       <span>{{ $t('showing', { from: offset + 1, to: Math.min(offset + limit, total), total }) }}</span>
       <div class="flex gap-2">
         <button @click="prevPage" :disabled="offset === 0" class="px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors disabled:opacity-40">{{ $t('prev') }}</button>
@@ -614,9 +614,9 @@ function roleLabel(role?: string) {
           <h2 class="text-lg font-semibold">{{ $t('adminUsers.userDetails') }}</h2>
           <button @click="showDetailModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
         </div>
-        <div class="grid grid-cols-2 gap-4 text-sm mb-6">
-          <div class="col-span-2"><div class="text-muted-foreground">{{ $t('adminUsers.uid') }}</div><div class="font-mono text-xs break-all">{{ detailUser.uid }}</div></div>
-          <div><div class="text-muted-foreground">{{ $t('adminUsers.email') }}</div><div class="font-medium">{{ detailUser.email }}</div></div>
+        <div class="grid grid-cols-1 gap-4 text-sm mb-6 sm:grid-cols-2">
+          <div class="sm:col-span-2"><div class="text-muted-foreground">{{ $t('adminUsers.uid') }}</div><div class="font-mono text-xs break-all">{{ detailUser.uid }}</div></div>
+          <div><div class="text-muted-foreground">{{ $t('adminUsers.email') }}</div><div class="font-medium break-all">{{ detailUser.email }}</div></div>
           <div><div class="text-muted-foreground">{{ $t('adminUsers.name') }}</div><div class="font-medium">{{ detailUser.display_name || '-' }}</div></div>
           <div><div class="text-muted-foreground">{{ $t('adminUsers.alias') }}</div><div class="font-medium">{{ detailUser.alias || '-' }}</div></div>
           <div><div class="text-muted-foreground">{{ $t('adminUsers.role') }}</div><div class="font-medium">{{ roleLabel(detailUser.role) }}</div></div>

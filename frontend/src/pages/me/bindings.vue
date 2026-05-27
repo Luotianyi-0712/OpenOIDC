@@ -181,10 +181,10 @@ function formatDate(iso: string) {
           <div
             v-for="item in boundProviders"
             :key="item.id"
-            class="border border-border rounded-xl p-5 flex items-center justify-between"
+            class="border border-border rounded-xl p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
           >
-            <div class="flex items-center gap-4">
-              <div class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+            <div class="flex items-start gap-4 min-w-0">
+              <div class="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
                 <img
                   v-if="item.iconUrl"
                   :src="item.iconUrl"
@@ -199,9 +199,9 @@ function formatDate(iso: string) {
                   {{ providerInitial(item.name) }}
                 </span>
               </div>
-              <div>
-                <div class="text-sm font-medium">{{ item.name }}</div>
-                <div class="text-xs text-muted-foreground mt-0.5">
+              <div class="min-w-0">
+                <div class="text-sm font-medium break-words">{{ item.name }}</div>
+                <div class="text-xs text-muted-foreground mt-0.5 break-all">
                   {{ item.binding.provider_name || item.binding.provider_uid }}
                 </div>
                 <div class="text-xs text-muted-foreground mt-0.5">
@@ -212,7 +212,7 @@ function formatDate(iso: string) {
             <button
               @click="confirmUnbind(item.id, item.name)"
               :disabled="unbindingProvider === item.id"
-              class="px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 disabled:opacity-50"
+              class="px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center justify-center gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 disabled:opacity-50 w-full sm:w-auto"
             >
               <Loader2 v-if="unbindingProvider === item.id" class="w-3 h-3 animate-spin" />
               <Unlink v-else class="w-3 h-3" />

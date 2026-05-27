@@ -109,7 +109,7 @@ function formatDate(d: string) {
             class="px-2 py-0.5 rounded-full text-xs font-medium"
             :class="app.is_active ? 'bg-green-50 text-green-700' : 'bg-muted text-muted-foreground'"
           >
-            {{ app.is_active ? 'active' : 'inactive' }}
+            {{ app.is_active ? $t('developer.active') : $t('developer.inactive') }}
           </span>
         </div>
       </router-link>

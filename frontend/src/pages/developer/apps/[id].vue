@@ -251,7 +251,7 @@ const integrationItems = computed(() => {
               class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10"
             />
             <div v-if="form.logo_url" class="mt-2">
-              <img :src="form.logo_url" alt="Logo preview" class="w-12 h-12 rounded-lg object-cover border border-border" />
+              <img :src="form.logo_url" :alt="$t('developer.logoPreview')" class="w-12 h-12 rounded-lg object-cover border border-border" />
             </div>
           </div>
 
@@ -354,14 +354,14 @@ const integrationItems = computed(() => {
       <div class="border border-border rounded-xl p-6 mb-6">
         <!-- User Count -->
         <div class="mb-5 pb-5 border-b border-border">
-          <div class="flex items-center justify-between gap-4">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div class="text-xs font-medium text-muted-foreground mb-1">{{ $t('developerApp.userCount') }}</div>
               <div class="text-2xl font-semibold">{{ app.user_count ?? '-' }}</div>
             </div>
             <router-link
               :to="`/developer/apps/${appId}/users`"
-              class="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+              class="inline-flex items-center justify-center gap-2 px-3 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors w-full sm:w-auto"
             >
               <Users class="w-4 h-4" />
               {{ $t('developerApp.viewUsers') }}
@@ -381,8 +381,8 @@ const integrationItems = computed(() => {
             <div class="text-xs font-medium text-muted-foreground mb-1.5">{{ item.label }}</div>
 
             <!-- Client Secret row -->
-            <div v-if="item.isSecret" class="flex items-center gap-2">
-              <code class="flex-1 text-sm font-mono break-all">{{ revealedSecret ? (secretVisible ? revealedSecret : '••••••••••') : $t('developer.secretUnavailable') }}</code>
+            <div v-if="item.isSecret" class="flex flex-wrap items-start gap-2">
+              <code class="min-w-0 flex-1 basis-full text-sm font-mono break-all sm:basis-0">{{ revealedSecret ? (secretVisible ? revealedSecret : '••••••••••') : $t('developer.secretUnavailable') }}</code>
               <button @click="secretVisible = !secretVisible" :disabled="!revealedSecret" class="shrink-0 p-1.5 rounded-lg hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <EyeOff v-if="secretVisible && revealedSecret" class="w-4 h-4 text-muted-foreground" />
                 <Eye v-else class="w-4 h-4 text-muted-foreground" />
@@ -400,8 +400,8 @@ const integrationItems = computed(() => {
             </div>
 
             <!-- Normal rows (Client ID + Endpoints) -->
-            <div v-else class="flex items-center gap-2">
-              <code class="flex-1 text-sm font-mono break-all">{{ item.value }}</code>
+            <div v-else class="flex items-start gap-2">
+              <code class="min-w-0 flex-1 text-sm font-mono break-all">{{ item.value }}</code>
               <button @click="copyToClipboard(item.value, item.key)" class="shrink-0 p-1.5 rounded-lg hover:bg-muted transition-colors">
                 <Check v-if="copiedField === item.key" class="w-4 h-4 text-green-600" />
                 <Copy v-else class="w-4 h-4 text-muted-foreground" />

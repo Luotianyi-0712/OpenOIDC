@@ -199,7 +199,7 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
           :key="report.id"
           class="border border-border rounded-lg p-4"
         >
-          <div class="flex items-start justify-between gap-4">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 text-sm">
                 <span class="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
@@ -213,7 +213,7 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
                 <span>{{ $t('adminRisk.reporter') }}: <code class="font-mono">{{ userLabel(report.reporter_uid, report.reporter_email, report.reporter_id) }}</code></span>
               </div>
             </div>
-            <div class="flex gap-2 shrink-0">
+            <div class="flex flex-wrap gap-2 sm:justify-end sm:shrink-0">
               <button
                 @click="openAction('confirm', report.id)"
                 class="px-3 py-1.5 text-xs font-medium bg-destructive text-white rounded-md hover:bg-destructive/90 transition-colors flex items-center gap-1"
@@ -246,7 +246,7 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
         {{ $t('adminRisk.noBlacklist') }}
       </div>
       <div v-else class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="w-full min-w-[760px] text-sm">
           <thead>
             <tr class="border-b border-border text-left text-muted-foreground">
               <th class="py-2 pr-4 font-medium">{{ $t('adminRisk.provider') }}</th>
@@ -279,8 +279,8 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
     </div>
 
     <!-- Action Dialog -->
-    <div v-if="actionDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+    <div v-if="actionDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-semibold mb-2">
           {{ actionType === 'confirm' ? $t('adminRisk.confirmReport') : $t('adminRisk.dismissReport') }}
         </h3>
@@ -317,8 +317,8 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
     </div>
 
     <!-- Add Risk Entry Dialog -->
-    <div v-if="addDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6">
+    <div v-if="addDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <h3 class="text-lg font-semibold mb-2">{{ $t('adminRisk.addEntry') }}</h3>
         <p class="text-sm text-muted-foreground mb-4">{{ $t('adminRisk.addHint') }}</p>
         <div class="space-y-4">

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version, for example v1.10
+        description: Release version, for example v1.11
         required: true
         type: string
       prerelease:
@@ -52,7 +52,7 @@ jobs:
           echo "RELEASE_TAG=v$VERSION" >> "$GITHUB_ENV"
 
       - name: Build Windows executable
-        run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o release/oidc.exe ./cmd/server
+        run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/anthropic/oidc-platform/internal/version.Version=${{ env.RELEASE_TAG }}" -o release/oidc.exe ./cmd/server
 
       - name: Package release
         run: |

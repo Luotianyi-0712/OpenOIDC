@@ -138,6 +138,9 @@ export default {
     minSecurityLevel: 'Minimum Trust Level',
     minSecurityLevelHint: 'Users below this level cannot log in to your app via this platform. Set to 0 for no restriction. The platform checks the level during authorization and rejects users who don\'t meet the requirement.',
     createLevelRequired: 'Your current trust level L{current} does not meet the required level L{min} to create apps. Existing apps remain manageable.',
+    active: 'Active',
+    inactive: 'Inactive',
+    logoPreview: 'Logo preview',
   },
 
   // Login
@@ -146,6 +149,7 @@ export default {
     subtitle: 'Sign in to your account to continue',
     email: 'Email',
     password: 'Password',
+    passwordPlaceholder: 'Enter your password',
     forgot: 'Forgot?',
     submit: 'Sign in',
     submitting: 'Signing in...',
@@ -176,6 +180,7 @@ export default {
     sendingCode: 'Sending...',
     resendCode: 'Resend code',
     sendCodeFailed: 'Failed to send code. Please try again later.',
+    registerFailed: 'Registration failed. Please try again.',
     submit: 'Create account',
     submitting: 'Creating account...',
     hasAccount: 'Already have an account?',

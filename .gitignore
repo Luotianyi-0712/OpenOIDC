@@ -49,6 +49,8 @@ logs/
 # Build artifacts
 tmp/
 .cache/
+release/
+*.zip
 
 # Generated keys
 *.pem

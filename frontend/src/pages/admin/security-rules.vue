@@ -484,16 +484,16 @@ function formatValue(cond: RuleCondition) {
 
 <template>
   <div>
-    <div class="flex items-start justify-between gap-4 mb-6">
+    <div class="flex flex-col gap-4 mb-6 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h2 class="text-lg font-semibold">{{ $t('adminRules.title') }}</h2>
         <p class="text-sm text-muted-foreground mt-1">{{ $t('adminRules.subtitle') }}</p>
       </div>
-      <div class="flex items-center gap-2">
-        <button @click="recomputeAll" :disabled="recomputing" class="border border-border px-4 py-2 rounded-full text-sm font-medium hover:bg-muted transition-colors flex items-center gap-2 disabled:opacity-50">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button @click="recomputeAll" :disabled="recomputing" class="border border-border px-4 py-2 rounded-full text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
           <RefreshCw class="w-4 h-4" :class="recomputing ? 'animate-spin' : ''" /> {{ $t('adminRules.recompute') }}
         </button>
-        <button @click="openCreate" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center gap-2">
+        <button @click="openCreate" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2">
           <Plus class="w-4 h-4" /> {{ $t('adminRules.createRule') }}
         </button>
       </div>
@@ -573,7 +573,7 @@ function formatValue(cond: RuleCondition) {
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminRules.description') }}</label>
             <input v-model="form.description" type="text" :placeholder="$t('adminRules.descriptionPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
           </div>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium mb-1.5">{{ $t('adminRules.level') }}</label>
               <input v-model.number="form.level" type="number" min="0" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
@@ -657,9 +657,9 @@ function formatValue(cond: RuleCondition) {
                 </div>
               </div>
 
-              <div class="flex justify-between items-center mt-3">
-                <p class="text-xs text-muted-foreground">{{ conditionLabel(cond) }}</p>
-                <button type="button" @click="removeCondition(i)" class="text-destructive hover:text-destructive/80 flex items-center gap-1 text-xs">
+              <div class="flex flex-col gap-2 mt-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs text-muted-foreground break-words">{{ conditionLabel(cond) }}</p>
+                <button type="button" @click="removeCondition(i)" class="text-destructive hover:text-destructive/80 flex items-center gap-1 text-xs shrink-0">
                   <MinusCircle class="w-4 h-4" /> {{ $t('adminRules.removeCondition') }}
                 </button>
               </div>

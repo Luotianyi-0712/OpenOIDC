@@ -427,12 +427,12 @@ function formatDateTime(value: string) {
 
 <template>
   <div>
-    <div class="flex items-start justify-between gap-4 mb-6">
+    <div class="flex flex-col gap-4 mb-6 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h2 class="text-lg font-semibold">{{ $t('adminClients.title') }}</h2>
         <p class="text-sm text-muted-foreground mt-1">{{ $t('adminClients.subtitle') }}</p>
       </div>
-      <button @click="openCreate" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center gap-2">
+      <button @click="openCreate" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto">
         <Plus class="w-4 h-4" /> {{ $t('adminClients.createClient') }}
       </button>
     </div>
@@ -508,7 +508,7 @@ function formatDateTime(value: string) {
       </table>
     </div>
 
-    <div v-if="total > 0" class="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+    <div v-if="total > 0" class="flex flex-col gap-3 mt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
       <span>{{ $t('showing', { from: offset + 1, to: Math.min(offset + limit, total), total }) }}</span>
       <div class="flex gap-2">
         <button @click="prevPage" :disabled="offset === 0" class="px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors disabled:opacity-40">{{ $t('prev') }}</button>
@@ -705,7 +705,7 @@ function formatDateTime(value: string) {
         </div>
         <div v-else class="border border-border rounded-xl overflow-hidden">
           <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="w-full min-w-[960px] text-sm">
               <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 <tr>
                   <th class="px-4 py-3">{{ $t('adminClients.userUid') }}</th>
@@ -779,7 +779,7 @@ function formatDateTime(value: string) {
           </div>
         </div>
 
-        <div v-if="clientUsersTotal > 0" class="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+        <div v-if="clientUsersTotal > 0" class="flex flex-col gap-3 mt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>{{ $t('showing', { from: clientUsersFrom, to: clientUsersTo, total: clientUsersTotal }) }}</span>
           <div class="flex gap-2">
             <button @click="prevClientUsersPage" :disabled="clientUsersOffset === 0" class="px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors disabled:opacity-40">{{ $t('prev') }}</button>

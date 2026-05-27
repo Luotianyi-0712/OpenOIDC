@@ -218,7 +218,7 @@ function categoryLabel(category: string) {
 
     <div v-else class="border border-border rounded-xl overflow-hidden bg-white">
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="w-full min-w-[960px] text-sm">
           <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <tr>
               <th class="px-4 py-3">{{ $t('developerApp.uid') }}</th>
@@ -268,7 +268,7 @@ function categoryLabel(category: string) {
               </td>
               <td class="px-4 py-3 align-top text-muted-foreground whitespace-nowrap text-xs">{{ formatTime(user.last_used_at) }}</td>
               <td class="px-4 py-3 align-top">
-                <div class="flex justify-end gap-2">
+                <div class="flex flex-wrap justify-end gap-2">
                   <button @click="openReport(user)" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium hover:bg-muted transition-colors">
                     <ShieldAlert class="w-3.5 h-3.5" />
                     {{ $t('developerApp.report') }}

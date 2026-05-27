@@ -138,6 +138,9 @@ export default {
     minSecurityLevel: '最低信任等级',
     minSecurityLevelHint: '低于此等级的用户无法通过本平台登录你的应用。设为 0 表示不限制。平台会在用户授权时检查等级，不满足要求会被拒绝。',
     createLevelRequired: '当前信任等级 L{current} 未达到创建应用要求 L{min}，暂时无法创建新应用。已有应用仍可继续管理。',
+    active: '正常',
+    inactive: '停用',
+    logoPreview: 'Logo 预览',
   },
 
   // Login
@@ -146,6 +149,7 @@ export default {
     subtitle: '登录您的账户以继续',
     email: '邮箱',
     password: '密码',
+    passwordPlaceholder: '请输入密码',
     forgot: '忘记密码？',
     submit: '登录',
     submitting: '登录中...',
@@ -176,6 +180,7 @@ export default {
     sendingCode: '发送中...',
     resendCode: '重新发送验证码',
     sendCodeFailed: '验证码发送失败，请稍后再试。',
+    registerFailed: '注册失败，请稍后再试。',
     submit: '注册',
     submitting: '注册中...',
     hasAccount: '已有账户？',

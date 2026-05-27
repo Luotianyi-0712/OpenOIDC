@@ -43,9 +43,9 @@ function toggleLocale() {
 <template>
   <div class="min-h-screen">
     <nav class="fixed top-0 inset-x-0 z-50 bg-white/85 backdrop-blur-xl border-b border-border">
-      <div class="max-w-[1200px] mx-auto px-6 md:px-10 h-16 flex items-center justify-between">
+      <div class="max-w-[1200px] mx-auto px-4 sm:px-6 md:px-10 h-16 flex items-center justify-between gap-3">
         <!-- Brand -->
-        <RouterLink to="/" class="flex items-center gap-2.5 font-bold text-lg tracking-tight">
+        <RouterLink to="/" class="flex items-center gap-2.5 font-bold text-lg tracking-tight shrink-0">
           <div class="w-7 h-7 bg-foreground rounded-md flex items-center justify-center text-white">
             <Fingerprint class="w-4 h-4" />
           </div>
@@ -101,15 +101,15 @@ function toggleLocale() {
         </ul>
 
         <!-- Right-side items -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <template v-if="auth.isLoggedIn">
             <RouterLink to="/me" class="hidden sm:inline-flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-3 py-2">{{ $t('nav.account') }}</RouterLink>
             <RouterLink v-if="auth.canShowDeveloperConsole" to="/developer" class="hidden lg:inline-flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-3 py-2">{{ $t('nav.developers') }}</RouterLink>
             <RouterLink v-if="auth.isAdmin" to="/admin" class="text-sm bg-foreground text-white px-3 sm:px-4 py-2 rounded-full font-medium hover:bg-foreground/90 transition-colors">{{ $t('nav.admin') }}</RouterLink>
           </template>
           <template v-else>
-            <RouterLink to="/login" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-3 py-2">{{ $t('nav.login') }}</RouterLink>
-            <RouterLink to="/register" class="text-sm bg-foreground text-white px-4 py-2 rounded-full font-medium hover:bg-foreground/90 transition-colors">{{ $t('nav.register') }}</RouterLink>
+            <RouterLink to="/login" class="hidden sm:inline-flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-3 py-2">{{ $t('nav.login') }}</RouterLink>
+            <RouterLink to="/register" class="hidden sm:inline-flex text-sm bg-foreground text-white px-4 py-2 rounded-full font-medium hover:bg-foreground/90 transition-colors">{{ $t('nav.register') }}</RouterLink>
           </template>
           <button @click="toggleLocale" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 py-1 rounded border border-border">
             {{ locale === 'zh' ? 'EN' : '中文' }}

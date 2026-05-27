@@ -467,7 +467,15 @@ func validateHTTPURL(key, value string) error {
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return fmt.Errorf("%w: %s must use http or https", ErrInvalidInput, key)
 	}
+	if u.Scheme == "http" && !isLoopbackHost(u.Hostname()) {
+		return fmt.Errorf("%w: %s must use https unless it points to localhost", ErrInvalidInput, key)
+	}
 	return nil
+}
+
+func isLoopbackHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	return host == "localhost" || strings.HasSuffix(host, ".localhost") || host == "127.0.0.1" || host == "::1"
 }
 
 func (s *AdminService) GetSetting(ctx context.Context, key string) (*domain.GlobalSetting, error) {
@@ -481,7 +489,7 @@ func (s *AdminService) GetSetting(ctx context.Context, key string) (*domain.Glob
 	return g, nil
 }
 
-func (s *AdminService) UpdateSetting(ctx context.Context, key, value, desc string) error {
+func (s *AdminService) UpdateSetting(ctx context.Context, key, value, desc string, adminID uuid.UUID) error {
 	key = strings.TrimSpace(key)
 	if key == "" {
 		return fmt.Errorf("%w: key required", ErrInvalidInput)
@@ -493,7 +501,22 @@ func (s *AdminService) UpdateSetting(ctx context.Context, key, value, desc strin
 		}
 		value = normalized
 	}
-	return s.settingsRepo.Upsert(ctx, key, value, desc)
+	if err := s.settingsRepo.Upsert(ctx, key, value, desc); err != nil {
+		return err
+	}
+	if s.auditRepo != nil {
+		rt := "setting"
+		_ = s.auditRepo.CreateLog(ctx, &domain.AuditLog{
+			ID:           uuid.New(),
+			UserID:       &adminID,
+			Action:       "admin.setting_updated",
+			ResourceType: &rt,
+			ResourceID:   &key,
+			Details:      map[string]any{"key": key},
+			CreatedAt:    time.Now().UTC(),
+		})
+	}
+	return nil
 }
 
 func normalizeSiteURL(value string) (string, error) {

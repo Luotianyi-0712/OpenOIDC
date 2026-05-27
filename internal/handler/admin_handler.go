@@ -1408,12 +1408,17 @@ func (h *AdminHandler) ListSettings(w http.ResponseWriter, r *http.Request) {
 
 func (h *AdminHandler) UpdateSetting(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
+	adminID, err := mw.GetUserID(r.Context())
+	if err != nil {
+		Error(w, http.StatusUnauthorized, "unauthenticated", err.Error())
+		return
+	}
 	var req updateSettingRequest
 	if err := DecodeJSON(r, &req); err != nil {
 		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
-	if err := h.adminSvc.UpdateSetting(r.Context(), key, req.Value, req.Description); err != nil {
+	if err := h.adminSvc.UpdateSetting(r.Context(), key, req.Value, req.Description, adminID); err != nil {
 		mapAdminError(w, err)
 		return
 	}

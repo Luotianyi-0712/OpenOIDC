@@ -627,21 +627,25 @@ func (h *DeveloperHandler) ReportUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify the target user has actually authorized this app.
-	if h.consentRepo != nil {
-		apps, err := h.consentRepo.ListAuthorizedApps(r.Context(), targetID)
-		if err == nil {
-			found := false
-			for _, a := range apps {
-				if a.ClientID == client.ClientID {
-					found = true
-					break
-				}
-			}
-			if !found {
-				Error(w, http.StatusForbidden, "not_authorized", "target user has not authorized this app")
-				return
-			}
+	if h.consentRepo == nil {
+		Error(w, http.StatusNotImplemented, "not_implemented", "consent repository not available")
+		return
+	}
+	apps, err := h.consentRepo.ListAuthorizedApps(r.Context(), targetID)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	found := false
+	for _, a := range apps {
+		if a.ClientID == client.ClientID {
+			found = true
+			break
 		}
+	}
+	if !found {
+		Error(w, http.StatusForbidden, "not_authorized", "target user has not authorized this app")
+		return
 	}
 
 	if h.riskSvc == nil {

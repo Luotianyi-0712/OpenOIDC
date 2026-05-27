@@ -180,7 +180,7 @@ async function onSubmit() {
             :type="showPassword ? 'text' : 'password'"
             required
             autocomplete="current-password"
-            placeholder="Enter your password"
+            :placeholder="$t('login.passwordPlaceholder')"
             class="w-full pl-9.5 pr-10 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all"
           />
           <button

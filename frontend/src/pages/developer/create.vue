@@ -162,7 +162,7 @@ function closeSecretModal() {
         />
         <p class="text-xs text-muted-foreground mt-1">{{ $t('developer.logoUrlHint') }}</p>
         <div v-if="form.logo_url" class="mt-2">
-          <img :src="form.logo_url" alt="Logo preview" class="w-12 h-12 rounded-lg object-cover border border-border" />
+          <img :src="form.logo_url" :alt="$t('developer.logoPreview')" class="w-12 h-12 rounded-lg object-cover border border-border" />
         </div>
       </div>
 

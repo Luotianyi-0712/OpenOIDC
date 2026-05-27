@@ -82,7 +82,7 @@ async function onSubmit() {
     await auth.register(email.value, password.value, displayName.value, code.value, captchaToken.value || undefined)
     router.push('/login?registered=1')
   } catch (e: any) {
-    error.value = e.message || 'Registration failed. Please try again.'
+    error.value = e.message || t('register.registerFailed')
     resetCaptcha()
   } finally {
     loading.value = false

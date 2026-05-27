@@ -378,7 +378,7 @@ async function deleteAlias(id: string) {
         <div class="grid gap-3 sm:grid-cols-2">
           <div class="flex items-center justify-between rounded-lg border border-border bg-white px-4 py-3">
             <span class="text-sm text-muted-foreground">{{ $t('adminSettings.currentVersion') }}</span>
-            <code class="text-sm font-mono font-semibold">{{ publicConfigLoaded ? publicSettings.version : 'v1.10' }}</code>
+            <code class="text-sm font-mono font-semibold">{{ publicConfigLoaded ? publicSettings.version : 'v1.11' }}</code>
           </div>
           <div v-if="versionCheck" class="flex items-center justify-between rounded-lg border border-border bg-white px-4 py-3">
             <span class="text-sm text-muted-foreground">{{ $t('adminSettings.latestVersion') }}</span>
@@ -561,8 +561,8 @@ async function deleteAlias(id: string) {
       <div class="border border-border rounded-xl p-6 mt-8">
         <h3 class="text-base font-semibold mb-2">{{ $t('adminSettings.developerTitle') }}</h3>
         <p class="text-sm text-muted-foreground mb-4">{{ $t('adminSettings.developerDesc') }}</p>
-        <form @submit.prevent="saveDeveloperLevel" class="flex items-end gap-4">
-          <div class="w-32">
+        <form @submit.prevent="saveDeveloperLevel" class="flex flex-col sm:flex-row sm:items-end gap-4">
+          <div class="w-full sm:w-32">
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.developerMinLevel') }}</label>
             <input v-model.number="developerMinLevel" type="number" min="0" max="10" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
           </div>
@@ -579,21 +579,21 @@ async function deleteAlias(id: string) {
         <h3 class="text-base font-semibold mb-2">{{ $t('adminSettings.aliasTitle') }}</h3>
         <p class="text-sm text-muted-foreground mb-4">{{ $t('adminSettings.aliasDesc') }}</p>
         <div v-if="aliases.length" class="mb-4 space-y-2">
-          <div v-for="alias in aliases" :key="alias.id" class="flex items-center justify-between px-3 py-2 bg-muted/50 rounded-lg">
-            <div>
-              <code class="text-xs font-mono">{{ alias.pattern }}</code>
+          <div v-for="alias in aliases" :key="alias.id" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+            <div class="min-w-0">
+              <code class="text-xs font-mono break-all">{{ alias.pattern }}</code>
               <span class="text-xs text-muted-foreground ml-2">{{ aliasRuleTypeLabel(alias.restriction_type) }}</span>
-              <span v-if="alias.reason" class="text-xs text-muted-foreground ml-2">— {{ alias.reason }}</span>
+              <span v-if="alias.reason" class="text-xs text-muted-foreground ml-2 break-words">— {{ alias.reason }}</span>
             </div>
-            <button @click="deleteAlias(alias.id)" class="text-xs text-destructive hover:underline">{{ $t('delete') }}</button>
+            <button @click="deleteAlias(alias.id)" class="self-start sm:self-auto text-xs text-destructive hover:underline">{{ $t('delete') }}</button>
           </div>
         </div>
-        <form @submit.prevent="addAlias" class="flex items-end gap-2">
-          <div class="flex-1">
+        <form @submit.prevent="addAlias" class="flex flex-col lg:flex-row lg:items-end gap-2">
+          <div class="w-full lg:flex-1">
             <label class="block text-xs font-medium mb-1">{{ $t('adminSettings.aliasPattern') }}</label>
             <input v-model="newAlias.pattern" type="text" :placeholder="$t('adminSettings.aliasPatternPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
           </div>
-          <div class="w-36">
+          <div class="w-full lg:w-36">
             <label class="block text-xs font-medium mb-1">{{ $t('adminSettings.aliasType') }}</label>
             <select v-model="newAlias.restriction_type" class="w-full px-3 py-2 border border-border rounded-lg text-sm">
               <option value="blocked">{{ $t('adminSettings.aliasBlocked') }}</option>
@@ -601,7 +601,7 @@ async function deleteAlias(id: string) {
               <option value="regex_blocked">{{ $t('adminSettings.aliasRegex') }}</option>
             </select>
           </div>
-          <div class="flex-1">
+          <div class="w-full lg:flex-1">
             <label class="block text-xs font-medium mb-1">{{ $t('adminSettings.aliasReason') }}</label>
             <input v-model="newAlias.reason" type="text" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
           </div>
