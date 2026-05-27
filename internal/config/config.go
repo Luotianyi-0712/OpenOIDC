@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -177,6 +179,7 @@ func Load() (*Config, error) {
 	if err := v.Unmarshal(cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}
+	applyEnvOverrides(cfg)
 
 	providers := map[string]ProviderOAuth2Config{}
 	if oauth2 := v.GetStringMap("oauth2"); oauth2 != nil {
@@ -195,6 +198,118 @@ func Load() (*Config, error) {
 	cfg.OAuth2.Providers = providers
 
 	return cfg, nil
+}
+
+func applyEnvOverrides(cfg *Config) {
+	setString := func(name string, target *string) {
+		if value, ok := os.LookupEnv(name); ok {
+			*target = value
+		}
+	}
+	setInt := func(name string, target *int) {
+		if value, ok := os.LookupEnv(name); ok {
+			parsed, err := strconv.Atoi(strings.TrimSpace(value))
+			if err == nil {
+				*target = parsed
+			}
+		}
+	}
+	setBool := func(name string, target *bool) {
+		if value, ok := os.LookupEnv(name); ok {
+			parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+			if err == nil {
+				*target = parsed
+			}
+		}
+	}
+	setDuration := func(name string, target *time.Duration) {
+		if value, ok := os.LookupEnv(name); ok {
+			parsed, err := time.ParseDuration(strings.TrimSpace(value))
+			if err == nil {
+				*target = parsed
+			}
+		}
+	}
+
+	setString("OIDC_SERVER_HOST", &cfg.Server.Host)
+	setInt("OIDC_SERVER_PORT", &cfg.Server.Port)
+	setString("OIDC_SERVER_ISSUER", &cfg.Server.Issuer)
+	setString("OIDC_SERVER_PUBLIC_URL", &cfg.Server.BaseURL)
+	setDuration("OIDC_SERVER_READ_TIMEOUT", &cfg.Server.ReadTimeout)
+	setDuration("OIDC_SERVER_WRITE_TIMEOUT", &cfg.Server.WriteTimeout)
+	setDuration("OIDC_SERVER_SHUTDOWN_TIMEOUT", &cfg.Server.ShutdownTimeout)
+
+	setString("OIDC_DATABASE_DRIVER", &cfg.Database.Driver)
+	setString("OIDC_DATABASE_DSN", &cfg.Database.DSN)
+	setString("OIDC_DATABASE_HOST", &cfg.Database.Host)
+	setInt("OIDC_DATABASE_PORT", &cfg.Database.Port)
+	setString("OIDC_DATABASE_USER", &cfg.Database.User)
+	setString("OIDC_DATABASE_PASSWORD", &cfg.Database.Password)
+	setString("OIDC_DATABASE_NAME", &cfg.Database.DBName)
+	setString("OIDC_DATABASE_SSLMODE", &cfg.Database.SSLMode)
+	setInt("OIDC_DATABASE_MAX_CONNS", &cfg.Database.MaxOpenConns)
+	setInt("OIDC_DATABASE_MIN_CONNS", &cfg.Database.MaxIdleConns)
+	setDuration("OIDC_DATABASE_MAX_CONN_LIFETIME", &cfg.Database.MaxConnLifetime)
+	setDuration("OIDC_DATABASE_MAX_CONN_IDLE_TIME", &cfg.Database.MaxConnIdleTime)
+
+	setString("OIDC_REDIS_HOST", &cfg.Redis.Host)
+	setInt("OIDC_REDIS_PORT", &cfg.Redis.Port)
+	setString("OIDC_REDIS_PASSWORD", &cfg.Redis.Password)
+	setInt("OIDC_REDIS_DB", &cfg.Redis.DB)
+	setInt("OIDC_REDIS_POOL_SIZE", &cfg.Redis.PoolSize)
+	setInt("OIDC_REDIS_MIN_IDLE_CONNS", &cfg.Redis.MinIdleConns)
+
+	setString("OIDC_JWT_ALGORITHM", &cfg.JWT.SigningMethod)
+	setDuration("OIDC_JWT_ACCESS_TOKEN_TTL", &cfg.JWT.AccessTokenTTL)
+	setDuration("OIDC_JWT_REFRESH_TOKEN_TTL", &cfg.JWT.RefreshTokenTTL)
+	setDuration("OIDC_JWT_ID_TOKEN_TTL", &cfg.JWT.IDTokenTTL)
+	setDuration("OIDC_JWT_AUTH_CODE_TTL", &cfg.JWT.AuthCodeTTL)
+	setInt("OIDC_JWT_KEY_ROTATION_DAYS", &cfg.JWT.KeyRotationDays)
+
+	setString("OIDC_SESSION_COOKIE_NAME", &cfg.Session.CookieName)
+	setString("OIDC_SESSION_COOKIE_DOMAIN", &cfg.Session.CookieDomain)
+	setBool("OIDC_SESSION_COOKIE_SECURE", &cfg.Session.CookieSecure)
+	setBool("OIDC_SESSION_COOKIE_HTTP_ONLY", &cfg.Session.CookieHTTPOnly)
+	setString("OIDC_SESSION_COOKIE_SAME_SITE", &cfg.Session.CookieSameSite)
+	setDuration("OIDC_SESSION_TTL", &cfg.Session.TTL)
+
+	setString("OIDC_ADMIN_EMAIL", &cfg.Admin.Email)
+	setString("OIDC_ADMIN_PASSWORD", &cfg.Admin.Password)
+	setString("OIDC_LOG_LEVEL", &cfg.Log.Level)
+	setString("OIDC_LOG_FORMAT", &cfg.Log.Format)
+
+	setInt("OIDC_SECURITY_PASSWORD_MIN_LENGTH", &cfg.Security.PasswordMinLength)
+	setBool("OIDC_SECURITY_PASSWORD_REQUIRE_UPPER", &cfg.Security.PasswordRequireUpper)
+	setBool("OIDC_SECURITY_PASSWORD_REQUIRE_LOWER", &cfg.Security.PasswordRequireLower)
+	setBool("OIDC_SECURITY_PASSWORD_REQUIRE_DIGIT", &cfg.Security.PasswordRequireDigit)
+	setBool("OIDC_SECURITY_PASSWORD_REQUIRE_SYMBOL", &cfg.Security.PasswordRequireSymbol)
+	setInt("OIDC_SECURITY_MAX_LOGIN_ATTEMPTS", &cfg.Security.MaxLoginAttempts)
+	setDuration("OIDC_SECURITY_LOCKOUT_DURATION", &cfg.Security.LockoutDuration)
+	setInt("OIDC_SECURITY_BCRYPT_COST", &cfg.Security.BcryptCost)
+
+	setBool("OIDC_SOCIAL_AUTH_SYNC_ENABLED", &cfg.SocialAuthSync.Enabled)
+	setDuration("OIDC_SOCIAL_AUTH_SYNC_INTERVAL", &cfg.SocialAuthSync.Interval)
+	setInt("OIDC_SOCIAL_AUTH_SYNC_BATCH_SIZE", &cfg.SocialAuthSync.BatchSize)
+
+	setString("OIDC_SMS_PROVIDER", &cfg.SMS.Provider)
+	setString("OIDC_SMS_ACCESS_KEY", &cfg.SMS.AccessKey)
+	setString("OIDC_SMS_ACCESS_SECRET", &cfg.SMS.AccessSecret)
+	setString("OIDC_SMS_SIGN_NAME", &cfg.SMS.SignName)
+	setString("OIDC_SMS_TEMPLATE_CODE", &cfg.SMS.TemplateCode)
+	setDuration("OIDC_SMS_CODE_TTL", &cfg.SMS.CodeTTL)
+	setDuration("OIDC_SMS_SEND_INTERVAL", &cfg.SMS.SendInterval)
+	setInt("OIDC_SMS_DAILY_LIMIT", &cfg.SMS.DailyLimit)
+
+	setString("OIDC_SMTP_HOST", &cfg.SMTP.Host)
+	setInt("OIDC_SMTP_PORT", &cfg.SMTP.Port)
+	setString("OIDC_SMTP_USERNAME", &cfg.SMTP.Username)
+	setString("OIDC_SMTP_PASSWORD", &cfg.SMTP.Password)
+	setString("OIDC_SMTP_FROM", &cfg.SMTP.From)
+
+	setString("OIDC_SECRETS_CLIENT_SECRET_ENCRYPTION_KEY", &cfg.Secrets.ClientSecretEncryptionKey)
+	setString("OIDC_WEBAUTHN_RP_ID", &cfg.WebAuthn.RPID)
+	setString("OIDC_WEBAUTHN_RP_ORIGIN", &cfg.WebAuthn.RPOrigin)
+	setString("OIDC_WEBAUTHN_RP_DISPLAY_NAME", &cfg.WebAuthn.RPDisplayName)
 }
 
 func bindEnv(v *viper.Viper) {
