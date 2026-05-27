@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { Fingerprint, User, MonitorSmartphone, Link2, Shield, LogOut, Code2, ShieldCheck, ScrollText } from 'lucide-vue-next'
+import { Fingerprint, User, MonitorSmartphone, Link2, Shield, LogOut, Code2, ShieldCheck, ScrollText, LayoutDashboard } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, currentLocale } from '@/i18n'
@@ -42,10 +42,12 @@ function isActive(path: string) {
           OIDC
         </RouterLink>
         <div class="flex items-center gap-1 sm:gap-2 shrink-0">
-          <RouterLink v-if="auth.isLoggedIn" to="/developer" class="flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 sm:px-3 py-2 items-center gap-1.5">
-            <Code2 class="w-4 h-4" /> <span class="text-xs sm:text-sm">{{ $t('nav.developers') }}</span>
+          <RouterLink v-if="auth.isLoggedIn" to="/developer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 sm:px-3 py-2">
+            <Code2 class="w-4 h-4 shrink-0" /> <span class="text-xs sm:text-sm">{{ $t('nav.developers') }}</span>
           </RouterLink>
-          <RouterLink v-if="auth.isAdmin" to="/admin" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 sm:px-3 py-2">{{ $t('nav.admin') }}</RouterLink>
+          <RouterLink v-if="auth.isAdmin" to="/admin" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 sm:px-3 py-2">
+            <LayoutDashboard class="w-4 h-4 shrink-0" /> <span class="text-xs sm:text-sm">{{ $t('nav.admin') }}</span>
+          </RouterLink>
           <button @click="toggleLocale" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 py-1 rounded border border-border">
             {{ locale === 'zh' ? 'EN' : '中文' }}
           </button>
