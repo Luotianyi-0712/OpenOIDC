@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -124,13 +125,17 @@ func encodeRequest(req fosite.Requester) (*sessionEnvelope, []byte, error) {
 		RequestedAudience: req.GetRequestedAudience(),
 		GrantedAudience:   req.GetGrantedAudience(),
 	}
-	var buf bytes.Buffer
+
+	// Use JSON instead of gob to handle nil pointers in session
 	if sess := req.GetSession(); sess != nil {
-		if err := gob.NewEncoder(&buf).Encode(sess); err != nil {
+		sessData, err := json.Marshal(sess)
+		if err != nil {
 			return nil, nil, fmt.Errorf("encode session: %w", err)
 		}
+		env.Session = sessData
 	}
-	env.Session = buf.Bytes()
+
+	// Still use gob for the envelope
 	envBuf := bytes.Buffer{}
 	if err := gob.NewEncoder(&envBuf).Encode(env); err != nil {
 		return nil, nil, fmt.Errorf("encode envelope: %w", err)
@@ -143,11 +148,14 @@ func decodeRequest(data []byte, session fosite.Session) (fosite.Requester, error
 	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&env); err != nil {
 		return nil, fmt.Errorf("decode envelope: %w", err)
 	}
+
+	// Use JSON to decode session (matching the encoding)
 	if len(env.Session) > 0 && session != nil {
-		if err := gob.NewDecoder(bytes.NewReader(env.Session)).Decode(session); err != nil {
+		if err := json.Unmarshal(env.Session, session); err != nil {
 			return nil, fmt.Errorf("decode session: %w", err)
 		}
 	}
+
 	req := &fosite.Request{
 		ID:                env.RequestID,
 		RequestedAt:       env.RequestedAt,
