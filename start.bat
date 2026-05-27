@@ -23,6 +23,8 @@ echo   Admin: see configs\config.yaml
 echo ============================================
 echo.
 
+set OIDC_OAUTH2_SECRET=3ade3492fcfb11c22340b4a53b10bfa728b2a5c724e5ac007247307ff440ee38
+
 oidc.exe
 
 if %errorlevel% neq 0 (

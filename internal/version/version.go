@@ -1,3 +1,3 @@
 package version
 
-var Version = "v1.18"
+var Version = "v1.19"
