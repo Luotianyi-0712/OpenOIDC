@@ -71,6 +71,31 @@
 - **前端**：Vue 3 + Vite + TypeScript + Pinia，单包同时承载用户中心 / 开发者门户 / 后台管理。
 - **部署**：推荐直接拉取 GHCR Docker 镜像部署，也支持单二进制 + 前端 dist 的本地/手动部署方式。
 
+## 推荐部署
+
+推荐直接拉取 GHCR 镜像，通过 Docker Compose 启动应用、PostgreSQL 和 Redis：
+
+```bash
+cp .env.example .env
+# 生产使用前请先修改 .env 中的站点 URL、管理员密码和加密密钥。
+docker compose pull
+docker compose up -d
+```
+
+默认镜像：
+
+```text
+ghcr.io/luotianyi-0712/openoidc:latest
+```
+
+如需固定版本，可以指定：
+
+```bash
+OIDC_IMAGE=ghcr.io/luotianyi-0712/openoidc:v1.12 docker compose up -d
+```
+
+Docker 部署默认只暴露应用端口 `8080`；PostgreSQL 和 Redis 不映射到宿主机，只能被 Compose 内网中的应用容器访问。
+
 ## 路线图
 
 - [x] 邮箱注册 / 登录 / 找回

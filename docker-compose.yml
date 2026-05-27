@@ -7,8 +7,6 @@ services:
       POSTGRES_DB: ${OIDC_DATABASE_NAME:-oidc}
       POSTGRES_USER: ${OIDC_DATABASE_USER:-oidc}
       POSTGRES_PASSWORD: ${OIDC_DATABASE_PASSWORD:-oidc_secret}
-    ports:
-      - "${OIDC_POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,8 +19,6 @@ services:
     image: redis:7-alpine
     container_name: oidc-redis
     restart: unless-stopped
-    ports:
-      - "${OIDC_REDIS_EXPOSE_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     command: ["redis-server", "--appendonly", "yes"]

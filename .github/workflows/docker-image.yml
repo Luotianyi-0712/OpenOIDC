@@ -33,6 +33,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Read project version
+        id: version
+        run: |
+          VERSION=$(python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('internal/version/version.go').read_text()
+          match = re.search(r'Version\s*=\s*"([^"]+)"', text)
+          if not match:
+              raise SystemExit('version not found')
+          print(match.group(1))
+          PY
+          )
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -42,6 +57,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
             type=sha,prefix=sha-
+            type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and optionally push

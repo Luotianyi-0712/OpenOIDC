@@ -114,7 +114,7 @@ Use a fixed tag instead of `latest` when you want a pinned release:
 OIDC_IMAGE=ghcr.io/luotianyi-0712/openoidc:v1.12 docker compose up -d
 ```
 
-The server listens on `http://localhost:8080` by default. Change `OIDC_SERVER_ISSUER`, `OIDC_SERVER_PUBLIC_URL`, `OIDC_ADMIN_PASSWORD`, and `OIDC_SECRETS_CLIENT_SECRET_ENCRYPTION_KEY` in `.env` before any non-local use.
+The server listens on `http://localhost:8080` by default. PostgreSQL and Redis are not exposed to the host by default; only the app container can reach them on the Compose network. Change `OIDC_SERVER_ISSUER`, `OIDC_SERVER_PUBLIC_URL`, `OIDC_ADMIN_PASSWORD`, and `OIDC_SECRETS_CLIENT_SECRET_ENCRYPTION_KEY` in `.env` before any non-local use.
 
 ### Source / single-binary build
 
