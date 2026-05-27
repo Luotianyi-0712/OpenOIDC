@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version, for example v1.14
+        description: Release version, for example v1.15
         required: true
         type: string
       prerelease:
@@ -15,51 +15,113 @@ on:
 
 permissions:
   contents: write
-  actions: write
+  packages: write
 
 concurrency:
   group: release-${{ github.event.inputs.version }}
   cancel-in-progress: false
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: luotianyi-0712/openoidc
+
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.version.outputs.release_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Normalize release version
+      - name: Validate release version
+        id: version
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          VERSION="${VERSION#v}"
-          echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "RELEASE_TAG=v$VERSION" >> "$GITHUB_ENV"
+          INPUT_VERSION="${{ github.event.inputs.version }}"
+          SOURCE_VERSION=$(python3 - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('internal/version/version.go').read_text()
+          match = re.search(r'Version\s*=\s*"([^"]+)"', text)
+          if not match:
+              raise SystemExit('version not found')
+          print(match.group(1))
+          PY
+          )
+          if [ "$INPUT_VERSION" != "$SOURCE_VERSION" ]; then
+            echo "Release input version $INPUT_VERSION does not match source version $SOURCE_VERSION" >&2
+            exit 1
+          fi
+          echo "release_tag=$SOURCE_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create release tag
         run: |
+          RELEASE_TAG="${{ steps.version.outputs.release_tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git rev-parse "${RELEASE_TAG}" >/dev/null 2>&1; then
-            echo "Release tag ${RELEASE_TAG} already exists locally."
-          elif git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-            git fetch origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release tag $RELEASE_TAG already exists locally."
+          elif git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
           else
-            git tag -a "${RELEASE_TAG}" -m "OpenOIDC ${RELEASE_TAG}"
-            git push origin "refs/tags/${RELEASE_TAG}"
+            git tag -a "$RELEASE_TAG" -m "OpenOIDC $RELEASE_TAG"
+            git push origin "refs/tags/$RELEASE_TAG"
           fi
 
-      - name: Trigger Docker image workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run docker-image.yml --ref "${RELEASE_TAG}"
+  docker:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_tag }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.release_tag }}
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    needs:
+      - prepare
+      - docker
+    runs-on: ubuntu-latest
+    steps:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: OpenOIDC ${{ env.RELEASE_TAG }}
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          name: OpenOIDC ${{ needs.prepare.outputs.release_tag }}
           prerelease: ${{ github.event.inputs.prerelease }}
           generate_release_notes: true
           fail_on_unmatched_files: false

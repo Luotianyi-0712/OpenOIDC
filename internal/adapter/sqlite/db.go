@@ -159,6 +159,8 @@ func RunMigrations(db *sql.DB) error {
 		is_enabled BOOLEAN NOT NULL DEFAULT 0,
 		client_id TEXT,
 		client_secret TEXT,
+		scopes TEXT NOT NULL DEFAULT '[]',
+		redirect_path TEXT NOT NULL DEFAULT '',
 		extra_config TEXT,
 		sort_order INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME NOT NULL,
@@ -291,6 +293,8 @@ func RunMigrations(db *sql.DB) error {
 		`ALTER TABLE social_bindings ADD COLUMN last_auth_check_at DATETIME`,
 		`ALTER TABLE social_bindings ADD COLUMN last_auth_status TEXT NOT NULL DEFAULT 'unknown'`,
 		`ALTER TABLE social_bindings ADD COLUMN last_auth_error TEXT`,
+		`ALTER TABLE provider_configs ADD COLUMN scopes TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE provider_configs ADD COLUMN redirect_path TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE provider_configs ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
 	}
 	for _, stmt := range alterStmts {

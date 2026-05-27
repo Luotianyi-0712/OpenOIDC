@@ -129,6 +129,7 @@ function openPolicyTab() {
 }
 
 async function savePolicySettings() {
+  if (!policyLoaded.value || policyLoading.value) return
   policySaving.value = true
   try {
     await api.put('/admin/risk/policy', {
@@ -428,10 +429,10 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
         <div class="lg:col-span-2 xl:col-span-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p class="text-xs text-muted-foreground">{{ $t('adminRisk.policyFormatHint') }}</p>
           <div class="flex gap-2">
-            <button type="button" @click="loadPolicySettings" :disabled="policySaving" class="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50">
+            <button type="button" @click="loadPolicySettings" :disabled="policySaving || policyLoading" class="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50">
               {{ $t('adminRisk.reloadPolicy') }}
             </button>
-            <button type="submit" :disabled="policySaving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            <button type="submit" :disabled="policySaving || policyLoading || !policyLoaded" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
               <Loader2 v-if="policySaving" class="w-4 h-4 animate-spin" />
               {{ $t('adminRisk.savePolicy') }}
             </button>

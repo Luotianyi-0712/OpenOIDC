@@ -15,11 +15,12 @@ import (
 
 type SessionService struct {
 	sessionRepo port.SessionRepository
+	userRepo    port.UserRepository
 	cfg         *config.Config
 }
 
-func NewSessionService(sessionRepo port.SessionRepository, cfg *config.Config) *SessionService {
-	return &SessionService{sessionRepo: sessionRepo, cfg: cfg}
+func NewSessionService(sessionRepo port.SessionRepository, userRepo port.UserRepository, cfg *config.Config) *SessionService {
+	return &SessionService{sessionRepo: sessionRepo, userRepo: userRepo, cfg: cfg}
 }
 
 func (s *SessionService) ValidateSession(ctx context.Context, token string) (*domain.UserSession, error) {
@@ -36,6 +37,17 @@ func (s *SessionService) ValidateSession(ctx context.Context, token string) (*do
 	if session.ExpiresAt.Before(time.Now().UTC()) {
 		_ = s.sessionRepo.Delete(ctx, session.ID)
 		return nil, ErrSessionExpired
+	}
+	if s.userRepo != nil {
+		user, err := s.userRepo.GetByID(ctx, session.UserID)
+		if err != nil {
+			_ = s.sessionRepo.Delete(ctx, session.ID)
+			return nil, ErrSessionNotFound
+		}
+		if user.Status != domain.UserStatusActive {
+			_ = s.sessionRepo.Delete(ctx, session.ID)
+			return nil, ErrAccessDenied
+		}
 	}
 	return session, nil
 }

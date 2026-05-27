@@ -1149,7 +1149,7 @@ export default {
     blockedDomains: 'Blocked email domains',
     blockedDomainsHint: "Enter domains only, such as tempmail.example, without {'@'}.",
     blockedEmailPatterns: 'Blocked email regex',
-    blockedEmailPatternsHint: 'Enter regular expressions separated by lines, spaces, or commas. The default blocks registration emails with dots or plus tags before @, such as a.b@example.com and abc+tag@example.com.',
+    blockedEmailPatternsHint: "Enter regular expressions separated by lines, spaces, or commas. The default blocks registration emails with dots or plus tags before {'@'}, such as a.b{'@'}example.com and abc+tag{'@'}example.com.",
     policyFormatHint: 'Changes take effect immediately. Hits are written to audit logs under the risk.auth_blocked action.',
     reloadPolicy: 'Reload',
     savePolicy: 'Save blocking policy',

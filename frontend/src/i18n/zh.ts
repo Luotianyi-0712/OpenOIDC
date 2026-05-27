@@ -1143,7 +1143,7 @@ export default {
     blockedDomains: '阻断邮箱域名',
     blockedDomainsHint: "填写域名本身，例如 tempmail.example，不需要 {'@'}。",
     blockedEmailPatterns: '阻断邮箱正则',
-    blockedEmailPatternsHint: '按行、空格或逗号填写正则，默认拦截 @ 前包含点号或加号的注册邮箱，例如 a.b@example.com、abc+tag@example.com。',
+    blockedEmailPatternsHint: "按行、空格或逗号填写正则，默认拦截 {'@'} 前包含点号或加号的注册邮箱，例如 a.b{'@'}example.com、abc+tag{'@'}example.com。",
     policyFormatHint: '保存后立即生效；阻断命中会写入审计日志 admin/audit，可按 risk.auth_blocked 动作追踪。',
     reloadPolicy: '重新加载',
     savePolicy: '保存阻断策略',

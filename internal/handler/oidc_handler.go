@@ -11,6 +11,7 @@ import (
 	"github.com/ory/fosite"
 
 	"github.com/anthropic/oidc-platform/internal/config"
+	"github.com/anthropic/oidc-platform/internal/domain"
 	mw "github.com/anthropic/oidc-platform/internal/handler/middleware"
 	"github.com/anthropic/oidc-platform/internal/oidcprovider"
 	"github.com/anthropic/oidc-platform/internal/port"
@@ -91,6 +92,10 @@ func (h *OIDCHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		h.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrServerError.WithWrap(err))
+		return
+	}
+	if user.Status != domain.UserStatusActive {
+		h.provider.WriteAuthorizeError(ctx, w, ar, fosite.ErrAccessDenied.WithHint("user account is not active"))
 		return
 	}
 
@@ -366,15 +371,19 @@ func (h *OIDCHandler) ConsentAccept(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "invalid_challenge", "consent challenge expired or invalid")
 		return
 	}
-	_ = h.cache.Delete(r.Context(), "consent:"+req.ConsentChallenge)
-	if err := h.cache.Set(r.Context(), "consent_accepted:"+req.ConsentChallenge, data, 5*time.Minute); err != nil {
-		Error(w, http.StatusInternalServerError, "internal", "failed to accept challenge")
-		return
-	}
-
 	var challenge consentChallenge
 	if err := json.Unmarshal(data, &challenge); err != nil {
 		Error(w, http.StatusInternalServerError, "internal", "failed to unmarshal challenge")
+		return
+	}
+	userID, err := mw.GetUserID(r.Context())
+	if err != nil || challenge.UserID != userID.String() {
+		Error(w, http.StatusForbidden, "forbidden", "consent challenge does not belong to current user")
+		return
+	}
+	_ = h.cache.Delete(r.Context(), "consent:"+req.ConsentChallenge)
+	if err := h.cache.Set(r.Context(), "consent_accepted:"+req.ConsentChallenge, data, 5*time.Minute); err != nil {
+		Error(w, http.StatusInternalServerError, "internal", "failed to accept challenge")
 		return
 	}
 
@@ -403,15 +412,22 @@ func (h *OIDCHandler) ConsentReject(w http.ResponseWriter, r *http.Request) {
 	if req.ConsentChallenge != "" && h.cache != nil {
 		data, err := h.cache.Get(r.Context(), "consent:"+req.ConsentChallenge)
 		if err == nil {
-			_ = h.cache.Delete(r.Context(), "consent:"+req.ConsentChallenge)
 			var challenge consentChallenge
-			if json.Unmarshal(data, &challenge) == nil {
-				JSON(w, http.StatusOK, map[string]any{
-					"rejected":     true,
-					"redirect_uri": buildConsentRejectRedirect(challenge),
-				})
+			if err := json.Unmarshal(data, &challenge); err != nil {
+				Error(w, http.StatusInternalServerError, "internal", "failed to unmarshal challenge")
 				return
 			}
+			userID, err := mw.GetUserID(r.Context())
+			if err != nil || challenge.UserID != userID.String() {
+				Error(w, http.StatusForbidden, "forbidden", "consent challenge does not belong to current user")
+				return
+			}
+			_ = h.cache.Delete(r.Context(), "consent:"+req.ConsentChallenge)
+			JSON(w, http.StatusOK, map[string]any{
+				"rejected":     true,
+				"redirect_uri": buildConsentRejectRedirect(challenge),
+			})
+			return
 		}
 	}
 

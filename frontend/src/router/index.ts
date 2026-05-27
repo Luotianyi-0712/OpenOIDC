@@ -23,7 +23,7 @@ const router = createRouter({
         { path: 'register', component: () => import('@/pages/register.vue') },
         { path: 'forgot-password', component: () => import('@/pages/forgot-password.vue') },
         { path: 'reset-password', component: () => import('@/pages/reset-password.vue') },
-        { path: 'authorize', component: () => import('@/pages/authorize.vue') },
+        { path: 'authorize', component: () => import('@/pages/authorize.vue'), meta: { requiresAuth: true } },
         { path: 'verify-email', component: () => import('@/pages/verify-email.vue') },
       ],
     },
@@ -78,6 +78,8 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (auth.loading) {
     await Promise.all([auth.fetchUser(), auth.fetchPublicSettings()])
+  } else if (to.meta.requiresAuth) {
+    await auth.fetchUser()
   }
   if (to.meta.requiresAuth && !auth.isLoggedIn) return { path: '/login', query: { return_to: to.fullPath } }
   if (auth.isLoggedIn) await auth.fetchDeveloperStatus()

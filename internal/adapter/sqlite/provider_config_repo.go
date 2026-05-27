@@ -24,17 +24,18 @@ func NewProviderConfigRepo(db *sql.DB) *ProviderConfigRepo {
 }
 
 const providerConfigColumns = `id, provider, display_name, is_enabled, client_id, client_secret,
-	extra_config, sort_order, created_at, updated_at`
+	scopes, redirect_path, extra_config, sort_order, created_at, updated_at`
 
 func scanProviderConfig(row interface{ Scan(...any) error }) (*domain.ProviderConfig, error) {
 	var pc domain.ProviderConfig
 	var id string
 	var clientID, clientSecret sql.NullString
+	var scopes string
 	var extra sql.NullString
 
 	err := row.Scan(
 		&id, &pc.Provider, &pc.DisplayName, &pc.IsEnabled,
-		&clientID, &clientSecret, &extra, &pc.SortOrder,
+		&clientID, &clientSecret, &scopes, &pc.RedirectPath, &extra, &pc.SortOrder,
 		&pc.CreatedAt, &pc.UpdatedAt,
 	)
 	if err != nil {
@@ -43,6 +44,10 @@ func scanProviderConfig(row interface{ Scan(...any) error }) (*domain.ProviderCo
 	pc.ID = uuid.MustParse(id)
 	pc.ClientID = fromNullString(clientID)
 	pc.ClientSecret = fromNullString(clientSecret)
+	_ = json.Unmarshal([]byte(scopes), &pc.Scopes)
+	if pc.Scopes == nil {
+		pc.Scopes = []string{}
+	}
 
 	if extra.Valid && extra.String != "" {
 		_ = json.Unmarshal([]byte(extra.String), &pc.ExtraConfig)
@@ -96,6 +101,9 @@ func (r *ProviderConfigRepo) Upsert(ctx context.Context, pc *domain.ProviderConf
 	if pc.CreatedAt.IsZero() {
 		pc.CreatedAt = now
 	}
+	if pc.Scopes == nil {
+		pc.Scopes = []string{}
+	}
 	pc.UpdatedAt = now
 
 	var extraStr sql.NullString
@@ -109,11 +117,11 @@ func (r *ProviderConfigRepo) Upsert(ctx context.Context, pc *domain.ProviderConf
 
 	_, err := r.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO provider_configs
-		 (id, provider, display_name, is_enabled, client_id, client_secret, extra_config, sort_order, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 (id, provider, display_name, is_enabled, client_id, client_secret, scopes, redirect_path, extra_config, sort_order, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		pc.ID.String(), pc.Provider, pc.DisplayName, pc.IsEnabled,
 		toNullString(pc.ClientID), toNullString(pc.ClientSecret),
-		extraStr, pc.SortOrder, pc.CreatedAt, pc.UpdatedAt,
+		marshalStringSlice(pc.Scopes), pc.RedirectPath, extraStr, pc.SortOrder, pc.CreatedAt, pc.UpdatedAt,
 	)
 	return err
 }

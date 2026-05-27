@@ -26,6 +26,18 @@ func extractSessionToken(r *http.Request, cookieName string) string {
 	return ""
 }
 
+func clearSessionCookie(w http.ResponseWriter, cookieName string) {
+	if cookieName == "" {
+		cookieName = "oidc_session"
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:   cookieName,
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
+}
+
 func SessionAuth(sessionSvc *service.SessionService, cookieName string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +48,7 @@ func SessionAuth(sessionSvc *service.SessionService, cookieName string) func(htt
 			}
 			sess, err := sessionSvc.ValidateSession(r.Context(), token)
 			if err != nil {
+				clearSessionCookie(w, cookieName)
 				writeAuthError(w, "unauthenticated", "invalid session")
 				return
 			}
@@ -55,6 +68,8 @@ func OptionalSessionAuth(sessionSvc *service.SessionService, cookieName string) 
 					ctx := context.WithValue(r.Context(), UserIDKey, sess.UserID)
 					ctx = context.WithValue(ctx, SessionKey, sess)
 					r = r.WithContext(ctx)
+				} else {
+					clearSessionCookie(w, cookieName)
 				}
 			}
 			next.ServeHTTP(w, r)

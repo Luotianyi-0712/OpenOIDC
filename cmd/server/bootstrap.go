@@ -156,7 +156,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	// Services.
 	securitySvc := service.NewSecurityLevelService(ruleRepo, bindingRepo, userRepo, auditRepo)
 	authSvc := service.NewAuthService(userRepo, sessionRepo, cache, auditRepo, emailSender, settingsRepo, cfg)
-	sessionSvc := service.NewSessionService(sessionRepo, cfg)
+	sessionSvc := service.NewSessionService(sessionRepo, userRepo, cfg)
 	socialSvc := service.NewSocialService(bindingRepo, userRepo, socialRegistry, cache, securitySvc, sessionRepo, auditRepo, settingsRepo, riskListRepo, cfg)
 	clientSvc := service.NewClientService(clientRepo, accessRuleRepo, auditRepo, secretCipher)
 	adminSvc := service.NewAdminService(userRepo, providerCfgRepo, settingsRepo, aliasRepo, signingKeyRepo, auditRepo, passkeyRepo, cfg.Security)

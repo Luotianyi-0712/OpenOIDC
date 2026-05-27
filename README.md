@@ -1,6 +1,6 @@
 # OIDC Platform
 
-Current version: **v1.14**
+Current version: **v1.15**
 
 A self-hosted, developer-oriented identity platform built on top of OpenID Connect / OAuth 2.0. Users register with email and bind third-party accounts (GitHub, Gitee, GitLab, Discord, Google, Microsoft, Apple, Telegram, QQ, WeChat, phone, etc.) to raise their **trust level**. Downstream systems integrate once via standard OIDC and gain low-cost risk control by declaring a minimum trust level plus optional conditions.
 
@@ -111,7 +111,7 @@ ghcr.io/luotianyi-0712/openoidc:latest
 Use a fixed tag instead of `latest` when you want a pinned release:
 
 ```bash
-OIDC_IMAGE=ghcr.io/luotianyi-0712/openoidc:v1.14 docker compose up -d
+OIDC_IMAGE=ghcr.io/luotianyi-0712/openoidc:v1.15 docker compose up -d
 ```
 
 The server listens on `http://localhost:8080` by default. PostgreSQL and Redis are not exposed to the host by default; only the app container can reach them on the Compose network. Change `OIDC_SERVER_ISSUER`, `OIDC_SERVER_PUBLIC_URL`, `OIDC_ADMIN_PASSWORD`, and `OIDC_SECRETS_CLIENT_SECRET_ENCRYPTION_KEY` in `.env` before any non-local use.
