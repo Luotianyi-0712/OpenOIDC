@@ -45,11 +45,11 @@ function formatDate(d: string) {
 <template>
   <div>
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
       <h2 class="text-lg font-semibold">{{ $t('developer.title') }}</h2>
       <router-link
         to="/developer/create"
-        class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center gap-2"
+        class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
       >
         <Plus class="w-4 h-4" /> {{ $t('developer.createApp') }}
       </router-link>
@@ -103,7 +103,7 @@ function formatDate(d: string) {
             <p class="text-xs text-muted-foreground font-mono truncate">{{ app.client_id }}</p>
           </div>
         </div>
-        <div class="flex items-center justify-between text-xs text-muted-foreground">
+        <div class="flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>{{ formatDate(app.created_at) }}</span>
           <span
             class="px-2 py-0.5 rounded-full text-xs font-medium"

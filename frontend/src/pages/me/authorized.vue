@@ -63,15 +63,16 @@ async function revokeApp() {
       <div
         v-for="app in authorizedApps"
         :key="app.id"
-        class="border border-border rounded-lg p-4 flex items-center justify-between"
+        class="border border-border rounded-lg p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
       >
         <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm">{{ app.client_name }}</div>
+          <div class="font-medium text-sm break-words">{{ app.client_name }}</div>
+          <div class="mt-0.5 text-[11px] text-muted-foreground font-mono break-all">{{ app.client_id }}</div>
           <div v-if="app.scopes && app.scopes.length" class="mt-1.5 flex flex-wrap gap-1">
             <span
               v-for="scope in app.scopes"
               :key="scope"
-              class="px-2 py-0.5 text-xs bg-muted rounded"
+              class="px-2 py-0.5 text-xs bg-muted rounded break-all"
             >{{ scope }}</span>
           </div>
           <div v-if="app.granted_at" class="mt-1.5 text-xs text-muted-foreground">
@@ -80,7 +81,7 @@ async function revokeApp() {
         </div>
         <button
           @click="confirmRevoke(app)"
-          class="shrink-0 ml-4 px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors"
+          class="shrink-0 px-3 py-1.5 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors w-full sm:w-auto"
         >
           {{ $t('authorizedApps.revoke') }}
         </button>
@@ -88,23 +89,23 @@ async function revokeApp() {
     </div>
 
     <!-- Revoke Confirmation Modal -->
-    <div v-if="showRevokeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showRevokeModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showRevokeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showRevokeModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-lg font-semibold">{{ $t('authorizedApps.revoke') }}</h2>
           <button @click="showRevokeModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
         </div>
-        <p class="text-sm text-muted-foreground mb-1">
+        <p class="text-sm text-muted-foreground mb-1 break-words">
           <strong>{{ revokeTarget?.client_name }}</strong>
         </p>
         <p class="text-sm text-muted-foreground mb-5">
           {{ $t('authorizedApps.revokeConfirm') }}
         </p>
-        <div class="flex justify-end gap-2">
-          <button @click="showRevokeModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button @click="showRevokeModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">
             {{ $t('cancel') }}
           </button>
-          <button @click="revokeApp" :disabled="revoking" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+          <button @click="revokeApp" :disabled="revoking" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto">
             <Loader2 v-if="revoking" class="w-4 h-4 animate-spin" />
             {{ $t('authorizedApps.revoke') }}
           </button>

@@ -445,7 +445,7 @@ function formatDateTime(value: string) {
       <Loader2 class="w-5 h-5 animate-spin mr-2" /> {{ $t('loading') }}
     </div>
 
-    <div v-else class="border border-border rounded-xl overflow-x-auto">
+    <div v-else class="hidden md:block border border-border rounded-xl overflow-x-auto">
       <table class="w-full min-w-[980px] text-sm">
         <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <tr>
@@ -506,6 +506,52 @@ function formatDateTime(value: string) {
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div v-if="!loading || clients.length > 0" class="md:hidden space-y-3">
+      <div v-if="clients.length === 0" class="border border-border rounded-xl px-4 py-8 text-center text-muted-foreground text-sm">{{ $t('adminClients.noClients') }}</div>
+      <div v-for="client in clients" :key="client.id" class="border border-border rounded-xl p-4 bg-background space-y-3">
+        <div class="flex items-start gap-3 min-w-0">
+          <img v-if="client.logo_url" :src="client.logo_url" :alt="client.client_name" class="w-10 h-10 rounded-lg object-cover border border-border shrink-0" />
+          <div v-else class="w-10 h-10 rounded-lg bg-muted shrink-0"></div>
+          <div class="min-w-0 flex-1">
+            <div class="font-medium text-sm break-words">{{ client.client_name }}</div>
+            <div class="text-xs text-muted-foreground break-words">{{ client.description || $t('adminClients.noDescription') }}</div>
+            <div class="mt-1 text-[11px] text-muted-foreground font-mono break-all">{{ client.client_id }}</div>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="client.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'">
+            {{ client.is_active ? $t('adminProviders.enabled') : $t('adminProviders.disabled') }}
+          </span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+            {{ client.protocol_type || 'oidc' }}
+          </span>
+        </div>
+        <div class="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
+          <div class="break-words"><span class="font-medium text-foreground">{{ $t('adminClients.owner') }}：</span>{{ ownerLabel(client) }}</div>
+          <div v-if="client.owner_uid" class="font-mono break-all"><span class="font-medium text-foreground">{{ $t('adminUsers.uid') }}：</span>{{ client.owner_uid }}</div>
+          <div><span class="font-medium text-foreground">{{ $t('adminClients.updatedAt') }}：</span>{{ formatDateTime(client.updated_at || client.created_at) }}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="openEdit(client)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+            <Pencil class="w-3 h-3" /> {{ $t('edit') }}
+          </button>
+          <button @click="toggleClientActive(client)" :disabled="togglingClientId === client.id" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+            <Loader2 v-if="togglingClientId === client.id" class="w-3 h-3 animate-spin" />
+            <Power v-else class="w-3 h-3" /> {{ client.is_active ? $t('adminClients.disable') : $t('adminClients.enable') }}
+          </button>
+          <button @click="openUsers(client)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+            <Users class="w-3 h-3" /> {{ $t('adminClients.authorizedUsers') }}
+          </button>
+          <button v-if="client.is_confidential" @click="confirmRotate(client)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+            <RefreshCw class="w-3 h-3" /> {{ $t('adminClients.rotateSecret') }}
+          </button>
+          <button @click="confirmDelete(client)" class="col-span-2 text-xs font-medium px-2 py-2 rounded border border-destructive/30 hover:bg-destructive/5 transition-colors text-destructive flex items-center justify-center gap-1">
+            <Trash2 class="w-3 h-3" /> {{ $t('delete') }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div v-if="total > 0" class="flex flex-col gap-3 mt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
@@ -693,7 +739,7 @@ function formatDateTime(value: string) {
               @keyup.enter="searchClientUsers"
             />
           </div>
-          <button @click="searchClientUsers" :disabled="clientUsersLoading" class="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50">
+          <button @click="searchClientUsers" :disabled="clientUsersLoading" class="inline-flex items-center justify-center gap-2 px-3 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50 w-full sm:w-auto">
             <Loader2 v-if="clientUsersLoading" class="w-4 h-4 animate-spin" />
             <Search v-else class="w-4 h-4" />
             {{ $t('search') }}
@@ -703,7 +749,7 @@ function formatDateTime(value: string) {
         <div v-if="clientUsersLoading && clientUsers.length === 0" class="flex items-center justify-center py-12 text-muted-foreground">
           <Loader2 class="w-5 h-5 animate-spin mr-2" /> {{ $t('loading') }}
         </div>
-        <div v-else class="border border-border rounded-xl overflow-hidden">
+        <div v-else class="hidden md:block border border-border rounded-xl overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full min-w-[960px] text-sm">
               <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -779,6 +825,57 @@ function formatDateTime(value: string) {
           </div>
         </div>
 
+        <div v-if="!clientUsersLoading || clientUsers.length > 0" class="md:hidden space-y-3">
+          <div v-if="clientUsers.length === 0" class="border border-border rounded-xl px-4 py-10 text-center text-muted-foreground text-sm">{{ $t('adminClients.noAuthorizedUsers') }}</div>
+          <div v-for="user in clientUsers" :key="user.id" class="border border-border rounded-xl p-4 bg-background space-y-3">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-mono text-xs text-muted-foreground">UID {{ user.uid }}</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted">L{{ user.security_level }}</span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" :class="user.blocked ? 'bg-destructive/10 text-destructive' : 'bg-green-50 text-green-700'">
+                <Ban v-if="user.blocked" class="w-3 h-3" />
+                <CheckCircle2 v-else class="w-3 h-3" />
+                {{ user.blocked ? $t('adminClients.blocked') : $t('adminClients.allowed') }}
+              </span>
+            </div>
+            <div class="space-y-1">
+              <div class="font-medium text-sm break-words">{{ user.display_name || '-' }}</div>
+              <div class="text-xs text-muted-foreground break-all">{{ user.email || '-' }}</div>
+            </div>
+            <div v-if="user.providers?.length" class="flex flex-wrap gap-1.5">
+              <span v-for="provider in user.providers" :key="provider" class="px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground">{{ provider }}</span>
+            </div>
+            <div class="text-xs text-muted-foreground"><span class="font-medium text-foreground">{{ $t('adminClients.lastUsedAt') }}：</span>{{ formatDateTime(user.last_used_at) }}</div>
+            <div class="grid grid-cols-1 gap-2">
+              <button
+                v-if="user.blocked"
+                @click="unblockClientUser(user)"
+                :disabled="clientUserActionId === user.id"
+                class="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-border rounded-lg text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <Loader2 v-if="clientUserActionId === user.id" class="w-3.5 h-3.5 animate-spin" />
+                {{ $t('adminClients.unblockUser') }}
+              </button>
+              <button
+                v-else
+                @click="blockClientUser(user)"
+                :disabled="clientUserActionId === user.id"
+                class="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-destructive/30 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/5 transition-colors disabled:opacity-50"
+              >
+                <Loader2 v-if="clientUserActionId === user.id" class="w-3.5 h-3.5 animate-spin" />
+                {{ $t('adminClients.blockUser') }}
+              </button>
+              <button
+                @click="revokeClientUser(user)"
+                :disabled="clientUserActionId === user.id"
+                class="inline-flex items-center justify-center gap-1.5 px-3 py-2 border border-border rounded-lg text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <Loader2 v-if="clientUserActionId === user.id" class="w-3.5 h-3.5 animate-spin" />
+                {{ $t('adminClients.revokeAuthorization') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div v-if="clientUsersTotal > 0" class="flex flex-col gap-3 mt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>{{ $t('showing', { from: clientUsersFrom, to: clientUsersTo, total: clientUsersTotal }) }}</span>
           <div class="flex gap-2">
@@ -789,8 +886,8 @@ function formatDateTime(value: string) {
       </div>
     </div>
 
-    <div v-if="showRotateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showRotateModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
+    <div v-if="showRotateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showRotateModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-start gap-3 mb-4">
           <AlertTriangle class="w-5 h-5 text-yellow-600 mt-0.5" />
           <div>
@@ -798,17 +895,17 @@ function formatDateTime(value: string) {
             <p class="text-sm text-muted-foreground mt-1">{{ $t('adminClients.rotateConfirm', { name: rotatingClient?.client_name || '' }) }}</p>
           </div>
         </div>
-        <div class="flex justify-end gap-2">
-          <button @click="showRotateModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
-          <button @click="rotateSecret" :disabled="rotating" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button @click="showRotateModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">{{ $t('cancel') }}</button>
+          <button @click="rotateSecret" :disabled="rotating" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto">
             <Loader2 v-if="rotating" class="w-4 h-4 animate-spin" /> {{ $t('confirm') }}
           </button>
         </div>
       </div>
     </div>
 
-    <div v-if="showSecretModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg mx-4 p-6">
+    <div v-if="showSecretModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-2">{{ $t('adminClients.clientSecret') }}</h2>
         <p class="text-sm text-muted-foreground mb-4">{{ $t('adminClients.copySecretNow') }}</p>
         <div class="flex items-center gap-2 bg-muted rounded-lg p-3">
@@ -819,18 +916,18 @@ function formatDateTime(value: string) {
           </button>
         </div>
         <div class="flex justify-end mt-5">
-          <button @click="showSecretModal = false" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors">{{ $t('adminClients.done') }}</button>
+          <button @click="showSecretModal = false" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors w-full sm:w-auto">{{ $t('adminClients.done') }}</button>
         </div>
       </div>
     </div>
 
-    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showDeleteModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showDeleteModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-2">{{ $t('adminClients.deleteClient') }}</h2>
         <p class="text-sm text-muted-foreground mb-5">{{ $t('adminClients.deleteConfirm', { name: deletingClient?.client_name || '' }) }}</p>
-        <div class="flex justify-end gap-2">
-          <button @click="showDeleteModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
-          <button @click="deleteClient" :disabled="deleting" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button @click="showDeleteModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">{{ $t('cancel') }}</button>
+          <button @click="deleteClient" :disabled="deleting" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto">
             <Loader2 v-if="deleting" class="w-4 h-4 animate-spin" /> {{ $t('delete') }}
           </button>
         </div>

@@ -270,16 +270,16 @@ function formatDate(iso: string) {
     </template>
 
     <!-- Unbind Confirm Modal -->
-    <div v-if="showUnbindModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showUnbindModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showUnbindModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showUnbindModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-lg font-semibold">{{ $t('bindings.unbind') }}</h2>
           <button @click="showUnbindModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
         </div>
         <p class="text-sm text-muted-foreground mb-5">{{ $t('bindings.unbindConfirm') }}</p>
-        <div class="flex justify-end gap-2">
-          <button @click="showUnbindModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
-          <button @click="doUnbind" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors">{{ $t('confirm') }}</button>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button @click="showUnbindModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">{{ $t('cancel') }}</button>
+          <button @click="doUnbind" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors w-full sm:w-auto">{{ $t('confirm') }}</button>
         </div>
       </div>
     </div>

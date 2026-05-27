@@ -76,7 +76,7 @@ function truncateUA(ua: string, max = 60) {
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h2 class="text-lg font-semibold">{{ $t('sessions.title') }}</h2>
         <p class="text-sm text-muted-foreground mt-0.5">
@@ -86,7 +86,7 @@ function truncateUA(ua: string, max = 60) {
       <button
         v-if="!loading && sessions.length"
         @click="fetchSessions"
-        class="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted transition-colors"
+        class="px-3 py-1.5 text-xs font-medium border border-border rounded-lg hover:bg-muted transition-colors w-full sm:w-auto"
       >
         {{ $t('refresh') }}
       </button>
@@ -143,7 +143,7 @@ function truncateUA(ua: string, max = 60) {
 
       <div class="md:hidden space-y-3">
         <div v-for="session in sessions" :key="session.id" class="border border-border rounded-xl p-4 bg-background">
-          <div class="flex items-start justify-between gap-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
               <div class="font-mono text-xs break-all">{{ session.ip || '-' }}</div>
               <div class="mt-1 text-xs text-muted-foreground break-words" :title="session.user_agent">{{ truncateUA(session.user_agent, 96) }}</div>
@@ -151,7 +151,7 @@ function truncateUA(ua: string, max = 60) {
             <button
               @click="confirmRevoke(session.id)"
               :disabled="revokingId === session.id"
-              class="shrink-0 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 disabled:opacity-50"
+              class="shrink-0 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors flex items-center justify-center gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 disabled:opacity-50 w-full sm:w-auto"
             >
               <Loader2 v-if="revokingId === session.id" class="w-3 h-3 animate-spin" />
               <Trash2 v-else class="w-3 h-3" />
@@ -167,16 +167,16 @@ function truncateUA(ua: string, max = 60) {
     </div>
 
     <!-- Revoke Confirm Modal -->
-    <div v-if="showRevokeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showRevokeModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showRevokeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showRevokeModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-lg font-semibold">{{ $t('sessions.revoke') }}</h2>
           <button @click="showRevokeModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
         </div>
         <p class="text-sm text-muted-foreground mb-5">{{ $t('sessions.revokeConfirm') }}</p>
-        <div class="flex justify-end gap-2">
-          <button @click="showRevokeModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
-          <button @click="doRevoke" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors">{{ $t('confirm') }}</button>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button @click="showRevokeModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">{{ $t('cancel') }}</button>
+          <button @click="doRevoke" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors w-full sm:w-auto">{{ $t('confirm') }}</button>
         </div>
       </div>
     </div>

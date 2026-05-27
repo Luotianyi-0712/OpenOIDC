@@ -428,8 +428,8 @@ const integrationItems = computed(() => {
     </template>
 
     <!-- Secret Reveal Modal -->
-    <div v-if="showSecretModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg mx-4 p-6">
+    <div v-if="showSecretModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-2">{{ $t('developer.clientSecret') }}</h2>
         <p class="text-sm text-muted-foreground mb-4">
           {{ $t('developer.secretWarning') }}
@@ -442,7 +442,7 @@ const integrationItems = computed(() => {
           </button>
         </div>
         <div class="flex justify-end mt-5">
-          <button @click="showSecretModal = false" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors">
+          <button @click="showSecretModal = false" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors w-full sm:w-auto">
             {{ $t('developer.done') }}
           </button>
         </div>
@@ -450,8 +450,8 @@ const integrationItems = computed(() => {
     </div>
 
     <!-- Rotate Secret Confirmation Modal -->
-    <div v-if="showRotateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showRotateModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showRotateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showRotateModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-lg font-semibold">{{ $t('developer.rotateSecret') }}</h2>
           <button @click="showRotateModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
@@ -459,11 +459,11 @@ const integrationItems = computed(() => {
         <p class="text-sm text-muted-foreground mb-5">
           {{ $t('developer.rotateConfirm') }}
         </p>
-        <div class="flex justify-end gap-2">
-          <button @click="showRotateModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button @click="showRotateModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">
             {{ $t('cancel') }}
           </button>
-          <button @click="rotateSecret" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors">
+          <button @click="rotateSecret" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors w-full sm:w-auto">
             {{ $t('confirm') }}
           </button>
         </div>
@@ -471,17 +471,17 @@ const integrationItems = computed(() => {
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showDeleteModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showDeleteModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-2">{{ $t('developer.deleteApp') }}</h2>
         <p class="text-sm text-muted-foreground mb-5">
           {{ $t('developer.deleteConfirm') }}
         </p>
-        <div class="flex justify-end gap-2">
-          <button @click="showDeleteModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button @click="showDeleteModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">
             {{ $t('cancel') }}
           </button>
-          <button @click="deleteApp" :disabled="deleting" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+          <button @click="deleteApp" :disabled="deleting" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto">
             <Loader2 v-if="deleting" class="w-4 h-4 animate-spin" />
             {{ $t('delete') }}
           </button>

@@ -37,12 +37,26 @@ interface RiskListEntry {
   created_at: string
 }
 
-const tab = ref<'reports' | 'blacklist'>('reports')
+interface RiskPolicy {
+  enabled: boolean
+  blocked_ips: string
+  blocked_emails: string
+  blocked_email_domains: string
+}
+
+const tab = ref<'reports' | 'blacklist' | 'policy'>('reports')
 const reports = ref<RiskReport[]>([])
 const blacklist = ref<RiskListEntry[]>([])
 const loading = ref(false)
 const reportTotal = ref(0)
 const blacklistTotal = ref(0)
+const riskPolicyEnabled = ref(true)
+const blockedIPs = ref('')
+const blockedEmails = ref('')
+const blockedEmailDomains = ref('')
+const policyLoading = ref(false)
+const policySaving = ref(false)
+const policyLoaded = ref(false)
 
 // Confirm/Dismiss dialog
 const actionDialog = ref(false)
@@ -84,6 +98,48 @@ async function loadBlacklist() {
     blacklistTotal.value = res.meta?.total || 0
   } catch (e: any) {
     toast.error(e.message || t('adminRisk.loadBlacklistFailed'))
+  }
+}
+
+async function loadPolicySettings() {
+  policyLoading.value = true
+  try {
+    const res = await api.get<RiskPolicy>('/admin/risk/policy')
+    const policy = res.data
+    if (policy) {
+      riskPolicyEnabled.value = policy.enabled
+      blockedIPs.value = policy.blocked_ips || ''
+      blockedEmails.value = policy.blocked_emails || ''
+      blockedEmailDomains.value = policy.blocked_email_domains || ''
+    }
+    policyLoaded.value = true
+  } catch (e: any) {
+    toast.error(e.message || t('adminRisk.loadPolicyFailed'))
+  } finally {
+    policyLoading.value = false
+  }
+}
+
+function openPolicyTab() {
+  tab.value = 'policy'
+  if (!policyLoaded.value) loadPolicySettings()
+}
+
+async function savePolicySettings() {
+  policySaving.value = true
+  try {
+    await api.put('/admin/risk/policy', {
+      enabled: riskPolicyEnabled.value,
+      blocked_ips: blockedIPs.value,
+      blocked_emails: blockedEmails.value,
+      blocked_email_domains: blockedEmailDomains.value,
+    })
+    toast.success(t('adminRisk.policySaved'))
+    await loadPolicySettings()
+  } catch (e: any) {
+    toast.error(e.message || t('adminRisk.savePolicyFailed'))
+  } finally {
+    policySaving.value = false
   }
 }
 
@@ -181,10 +237,18 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
         {{ $t('adminRisk.blacklistTab') }}
         <span v-if="blacklistTotal > 0" class="ml-1.5 px-1.5 py-0.5 text-xs bg-muted text-muted-foreground rounded-full">{{ blacklistTotal }}</span>
       </button>
+      <button
+        @click="openPolicyTab"
+        class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
+        :class="tab === 'policy' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+      >
+        <AlertTriangle class="w-4 h-4 inline mr-1.5" />
+        {{ $t('adminRisk.policyTab') }}
+      </button>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex items-center justify-center py-12 text-muted-foreground">
+    <div v-if="tab === 'reports' && loading" class="flex items-center justify-center py-12 text-muted-foreground">
       <Loader2 class="w-5 h-5 animate-spin mr-2" /> {{ $t('loading') }}
     </div>
 
@@ -245,7 +309,7 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
       <div v-if="blacklist.length === 0" class="text-center text-muted-foreground py-12 text-sm">
         {{ $t('adminRisk.noBlacklist') }}
       </div>
-      <div v-else class="overflow-x-auto">
+      <div v-else class="hidden md:block overflow-x-auto">
         <table class="w-full min-w-[760px] text-sm">
           <thead>
             <tr class="border-b border-border text-left text-muted-foreground">
@@ -276,6 +340,89 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
           </tbody>
         </table>
       </div>
+      <div v-if="blacklist.length > 0" class="md:hidden space-y-3">
+        <div v-for="entry in blacklist" :key="entry.id" class="border border-border rounded-xl p-4 bg-background space-y-3">
+          <div class="flex flex-wrap gap-2">
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-muted font-mono">{{ entry.provider }}</span>
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">{{ userLabel(entry.user_uid, entry.user_email, entry.user_id) }}</span>
+          </div>
+          <div class="space-y-2 text-xs text-muted-foreground">
+            <div class="break-all"><span class="font-medium text-foreground">{{ $t('adminRisk.providerUid') }}：</span>{{ entry.provider_uid }}</div>
+            <div class="break-words"><span class="font-medium text-foreground">{{ $t('adminRisk.reason') }}：</span>{{ entry.reason }}</div>
+            <div><span class="font-medium text-foreground">{{ $t('adminRisk.time') }}：</span>{{ new Date(entry.created_at).toLocaleString() }}</div>
+          </div>
+          <button @click="removeEntry(entry.id)" class="w-full px-3 py-2 text-xs text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 transition-colors">
+            {{ $t('adminRisk.removeEntry') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Platform Policy Tab -->
+    <div v-else-if="tab === 'policy'" class="space-y-4">
+      <div class="rounded-xl border border-border bg-muted/30 p-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 class="text-base font-semibold">{{ $t('adminRisk.policyTitle') }}</h3>
+            <p class="text-sm text-muted-foreground mt-1">{{ $t('adminRisk.policyDesc') }}</p>
+          </div>
+          <label class="inline-flex items-center gap-2 text-sm font-medium cursor-pointer shrink-0">
+            <input v-model="riskPolicyEnabled" type="checkbox" class="rounded border-border" />
+            {{ $t('adminRisk.policyEnabled') }}
+          </label>
+        </div>
+      </div>
+
+      <div v-if="policyLoading" class="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
+        <Loader2 class="w-4 h-4 animate-spin" /> {{ $t('loading') }}
+      </div>
+      <form @submit.prevent="savePolicySettings" class="grid gap-4 lg:grid-cols-3">
+        <div class="rounded-xl border border-border p-4 bg-white">
+          <label class="block text-sm font-medium mb-1.5">{{ $t('adminRisk.blockedIPs') }}</label>
+          <p class="text-xs text-muted-foreground mb-3">{{ $t('adminRisk.blockedIPsHint') }}</p>
+          <textarea
+            v-model="blockedIPs"
+            rows="8"
+            placeholder="203.0.113.1\n2001:db8::/32"
+            class="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-foreground/10 resize-y"
+          />
+        </div>
+
+        <div class="rounded-xl border border-border p-4 bg-white">
+          <label class="block text-sm font-medium mb-1.5">{{ $t('adminRisk.blockedEmails') }}</label>
+          <p class="text-xs text-muted-foreground mb-3">{{ $t('adminRisk.blockedEmailsHint') }}</p>
+          <textarea
+            v-model="blockedEmails"
+            rows="8"
+            placeholder="bad@example.com\nspam@example.net"
+            class="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-foreground/10 resize-y"
+          />
+        </div>
+
+        <div class="rounded-xl border border-border p-4 bg-white">
+          <label class="block text-sm font-medium mb-1.5">{{ $t('adminRisk.blockedDomains') }}</label>
+          <p class="text-xs text-muted-foreground mb-3">{{ $t('adminRisk.blockedDomainsHint') }}</p>
+          <textarea
+            v-model="blockedEmailDomains"
+            rows="8"
+            placeholder="tempmail.example\ndisposable.test"
+            class="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-foreground/10 resize-y"
+          />
+        </div>
+
+        <div class="lg:col-span-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-xs text-muted-foreground">{{ $t('adminRisk.policyFormatHint') }}</p>
+          <div class="flex gap-2">
+            <button type="button" @click="loadPolicySettings" :disabled="policySaving" class="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors disabled:opacity-50">
+              {{ $t('adminRisk.reloadPolicy') }}
+            </button>
+            <button type="submit" :disabled="policySaving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+              <Loader2 v-if="policySaving" class="w-4 h-4 animate-spin" />
+              {{ $t('adminRisk.savePolicy') }}
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
 
     <!-- Action Dialog -->
@@ -296,17 +443,17 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
             class="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10"
           />
         </div>
-        <div class="flex justify-end gap-2">
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             @click="actionDialog = false"
-            class="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors"
+            class="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors w-full sm:w-auto"
           >
             {{ $t('cancel') }}
           </button>
           <button
             @click="submitAction"
             :disabled="actionLoading"
-            class="px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+            class="px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto"
             :class="actionType === 'confirm' ? 'bg-destructive text-white hover:bg-destructive/90' : 'bg-foreground text-white hover:bg-foreground/90'"
           >
             <Loader2 v-if="actionLoading" class="w-4 h-4 animate-spin" />
@@ -359,17 +506,17 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
             />
           </div>
         </div>
-        <div class="flex justify-end gap-2 mt-6">
+        <div class="flex flex-col-reverse gap-2 mt-6 sm:flex-row sm:justify-end">
           <button
             @click="addDialog = false"
-            class="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors"
+            class="px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-muted transition-colors w-full sm:w-auto"
           >
             {{ $t('cancel') }}
           </button>
           <button
             @click="submitAddEntry"
             :disabled="addLoading || !addForm.provider || !addForm.provider_uid || !addForm.reason"
-            class="px-4 py-2 text-sm font-medium bg-foreground text-white rounded-lg hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+            class="px-4 py-2 text-sm font-medium bg-foreground text-white rounded-lg hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             <Loader2 v-if="addLoading" class="w-4 h-4 animate-spin" />
             {{ $t('confirm') }}

@@ -42,8 +42,8 @@ function isActive(path: string) {
           OIDC
         </RouterLink>
         <div class="flex items-center gap-1 sm:gap-2 shrink-0">
-          <RouterLink v-if="auth.canShowDeveloperConsole" to="/developer" class="hidden sm:flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 sm:px-3 py-2 items-center gap-1.5">
-            <Code2 class="w-4 h-4" /> <span class="hidden md:inline">{{ $t('devNav.title') }}</span>
+          <RouterLink v-if="auth.isLoggedIn" to="/developer" class="flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 sm:px-3 py-2 items-center gap-1.5">
+            <Code2 class="w-4 h-4" /> <span class="text-xs sm:text-sm">{{ $t('nav.developers') }}</span>
           </RouterLink>
           <RouterLink v-if="auth.isAdmin" to="/admin" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 sm:px-3 py-2">{{ $t('nav.admin') }}</RouterLink>
           <button @click="toggleLocale" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 py-1 rounded border border-border">
@@ -56,19 +56,21 @@ function isActive(path: string) {
       </div>
     </nav>
 
-    <div class="max-w-[1200px] mx-auto px-6 md:px-10 pt-24 pb-16">
+    <div class="max-w-[1200px] mx-auto px-4 sm:px-6 md:px-10 pt-24 pb-16">
       <h1 class="text-2xl font-bold tracking-tight mb-6">{{ $t('dashboard.title') }}</h1>
-      <div class="flex gap-0 border-b border-border mb-8 overflow-x-auto">
-        <RouterLink
-          v-for="item in nav"
-          :key="item.to"
-          :to="item.to"
-          class="flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors"
-          :class="isActive(item.to) ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-        >
-          <component :is="item.icon" class="w-4 h-4" />
-          {{ item.label }}
-        </RouterLink>
+      <div class="-mx-4 sm:mx-0 mb-8 overflow-x-auto overscroll-x-contain border-b border-border px-4 sm:px-0">
+        <div class="flex min-w-max gap-0">
+          <RouterLink
+            v-for="item in nav"
+            :key="item.to"
+            :to="item.to"
+            class="flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors"
+            :class="isActive(item.to) ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
+          >
+            <component :is="item.icon" class="w-4 h-4 shrink-0" />
+            {{ item.label }}
+          </RouterLink>
+        </div>
       </div>
       <RouterView />
     </div>

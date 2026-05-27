@@ -210,6 +210,8 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Get("/keys", d.AdminHandler.ListKeys)
 			r.Post("/keys/rotate", d.AdminHandler.RotateKey)
 
+			r.Get("/risk/policy", d.AdminHandler.GetRiskPolicy)
+			r.Put("/risk/policy", d.AdminHandler.UpdateRiskPolicy)
 			r.Get("/risk/reports", d.AdminHandler.ListRiskReports)
 			r.Put("/risk/reports/{id}/confirm", d.AdminHandler.ConfirmRiskReport)
 			r.Put("/risk/reports/{id}/dismiss", d.AdminHandler.DismissRiskReport)

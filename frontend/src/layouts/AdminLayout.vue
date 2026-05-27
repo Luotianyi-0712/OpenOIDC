@@ -48,8 +48,8 @@ function isActive(path: string) {
           <RouterLink to="/me" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 sm:px-3 py-2 flex items-center gap-1.5">
             <ArrowLeft class="w-4 h-4" /> <span class="hidden sm:inline">{{ $t('nav.account') }}</span>
           </RouterLink>
-          <RouterLink to="/developer" class="hidden sm:flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-3 py-2 items-center gap-1.5">
-            <Code2 class="w-4 h-4" /> {{ $t('nav.developers') }}
+          <RouterLink to="/developer" class="flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 sm:px-3 py-2 items-center gap-1.5">
+            <Code2 class="w-4 h-4" /> <span class="text-xs sm:text-sm">{{ $t('nav.developers') }}</span>
           </RouterLink>
           <button @click="toggleLocale" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 py-1 rounded border border-border">
             {{ locale === 'zh' ? 'EN' : '中文' }}

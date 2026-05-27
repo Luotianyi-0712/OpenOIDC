@@ -56,6 +56,10 @@ const DEDICATED_SETTING_KEYS = new Set([
   'turnstile_site_key',
   'turnstile_secret_key',
   'developer_min_trust_level',
+  'risk_policy_enabled',
+  'risk_blocked_ips',
+  'risk_blocked_emails',
+  'risk_blocked_email_domains',
 ])
 
 function tOrFallback(path: string, fallback: string) {
@@ -378,7 +382,7 @@ async function deleteAlias(id: string) {
         <div class="grid gap-3 sm:grid-cols-2">
           <div class="flex items-center justify-between rounded-lg border border-border bg-white px-4 py-3">
             <span class="text-sm text-muted-foreground">{{ $t('adminSettings.currentVersion') }}</span>
-            <code class="text-sm font-mono font-semibold">{{ publicConfigLoaded ? publicSettings.version : 'v1.11' }}</code>
+            <code class="text-sm font-mono font-semibold">{{ publicConfigLoaded ? publicSettings.version : 'v1.12' }}</code>
           </div>
           <div v-if="versionCheck" class="flex items-center justify-between rounded-lg border border-border bg-white px-4 py-3">
             <span class="text-sm text-muted-foreground">{{ $t('adminSettings.latestVersion') }}</span>
@@ -414,7 +418,7 @@ async function deleteAlias(id: string) {
       </div>
 
       <!-- General Settings -->
-      <div class="border border-border rounded-xl overflow-x-auto mb-8">
+      <div class="hidden md:block border border-border rounded-xl overflow-x-auto mb-8">
         <table class="w-full min-w-[760px] text-sm">
           <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <tr>
@@ -450,6 +454,26 @@ async function deleteAlias(id: string) {
           </tbody>
         </table>
       </div>
+      <div class="md:hidden space-y-3 mb-8">
+        <div v-if="generalSettings.length === 0" class="border border-border rounded-xl px-4 py-8 text-center text-muted-foreground text-sm">{{ $t('adminSettings.noSettings') }}</div>
+        <div v-for="setting in generalSettings" :key="setting.key" class="border border-border rounded-xl p-4 bg-background space-y-3">
+          <div>
+            <div class="font-medium text-sm break-words">{{ settingLabel(setting.key) }}</div>
+            <div class="font-mono text-[11px] text-muted-foreground mt-0.5 break-all">{{ setting.key }}</div>
+          </div>
+          <div>
+            <label v-if="isBoolSetting(setting.key)" class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" :checked="setting.value === 'true'" @change="toggleBool(setting)" class="sr-only peer" />
+              <div class="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-foreground/10 rounded-full peer peer-checked:bg-green-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+            </label>
+            <code v-else class="text-xs bg-muted px-1.5 py-0.5 rounded break-all">{{ setting.value }}</code>
+          </div>
+          <div class="text-xs text-muted-foreground break-words">{{ settingDescription(setting) }}</div>
+          <button v-if="!isBoolSetting(setting.key)" @click="openEdit(setting)" class="w-full text-xs font-medium px-3 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+            <Pencil class="w-3 h-3" /> {{ $t('edit') }}
+          </button>
+        </div>
+      </div>
 
       <!-- SMTP Configuration -->
       <div class="border border-border rounded-xl p-6">
@@ -470,12 +494,12 @@ async function deleteAlias(id: string) {
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.smtpUsername') }}</label>
-            <input v-model="smtpForm.username" type="text" placeholder="noreply@example.com" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+            <input v-model="smtpForm.username" type="text" autocomplete="username" placeholder="noreply@example.com" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.smtpPassword') }}</label>
             <div class="relative">
-              <input v-model="smtpForm.password" :type="showSmtpPassword ? 'text' : 'password'" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+              <input v-model="smtpForm.password" :type="showSmtpPassword ? 'text' : 'password'" autocomplete="current-password" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
               <button
                 type="button"
                 @click="showSmtpPassword = !showSmtpPassword"
@@ -506,6 +530,7 @@ async function deleteAlias(id: string) {
         <h3 class="text-base font-semibold mb-2">{{ $t('adminSettings.captchaTitle') }}</h3>
         <p class="text-sm text-muted-foreground mb-4">{{ $t('adminSettings.captchaDesc') }}</p>
         <form @submit.prevent="saveCaptcha" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input type="text" :value="captchaForm.provider" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true" />
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.captchaProvider') }}</label>
             <select v-model="captchaForm.provider" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10">
@@ -520,7 +545,7 @@ async function deleteAlias(id: string) {
           <div class="md:col-span-2">
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.captchaSecretKey') }}</label>
             <div class="relative">
-              <input v-model="captchaForm.secretKey" :type="showCaptchaSecret ? 'text' : 'password'" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+              <input v-model="captchaForm.secretKey" :type="showCaptchaSecret ? 'text' : 'password'" autocomplete="new-password" :placeholder="$t('adminSettings.smtpPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
               <button
                 type="button"
                 @click="showCaptchaSecret = !showCaptchaSecret"
@@ -613,8 +638,8 @@ async function deleteAlias(id: string) {
     </template>
 
     <!-- Edit Modal -->
-    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg mx-4 p-6">
+    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-lg font-semibold">{{ $t('edit') }}</h2>
           <button @click="showModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
@@ -624,7 +649,7 @@ async function deleteAlias(id: string) {
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminSettings.key') }}</label>
             <div class="px-3 py-2 bg-muted rounded-lg text-sm">
               <div class="font-medium">{{ settingLabel(editingKey) }}</div>
-              <div class="font-mono text-xs text-muted-foreground mt-0.5">{{ editingKey }}</div>
+              <div class="font-mono text-xs text-muted-foreground mt-0.5 break-all">{{ editingKey }}</div>
             </div>
           </div>
           <div>
@@ -633,11 +658,11 @@ async function deleteAlias(id: string) {
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminRules.description') }}</label>
-            <div class="px-3 py-2 bg-muted rounded-lg text-sm text-muted-foreground">{{ editingDescription }}</div>
+            <div class="px-3 py-2 bg-muted rounded-lg text-sm text-muted-foreground break-words">{{ editingDescription }}</div>
           </div>
-          <div class="flex justify-end gap-2 mt-2">
-            <button type="button" @click="showModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
-            <button type="submit" :disabled="saving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+          <div class="flex flex-col-reverse gap-2 mt-2 sm:flex-row sm:justify-end">
+            <button type="button" @click="showModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">{{ $t('cancel') }}</button>
+            <button type="submit" :disabled="saving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto">
               <Loader2 v-if="saving" class="w-4 h-4 animate-spin" /> {{ $t('save') }}
             </button>
           </div>

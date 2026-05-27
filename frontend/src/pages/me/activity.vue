@@ -177,9 +177,9 @@ function rawDetails(entry: ActivityEntry): string {
           {{ $t('accountActivity.empty') }}
         </div>
         <div v-for="entry in entries" :key="entry.id" class="border border-border rounded-xl p-4 bg-background">
-          <div class="flex items-start justify-between gap-3">
-            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-muted break-words min-w-0">{{ formatAction(entry.action) }}</span>
-            <span class="text-xs text-muted-foreground whitespace-nowrap shrink-0">{{ formatTimestamp(entry.created_at) }}</span>
+          <div class="flex flex-col gap-2">
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-muted break-words min-w-0 w-fit max-w-full">{{ formatAction(entry.action) }}</span>
+            <span class="text-xs text-muted-foreground break-words">{{ formatTimestamp(entry.created_at) }}</span>
           </div>
           <div class="mt-3 space-y-2 text-xs text-muted-foreground">
             <div class="break-words"><span class="font-medium text-foreground">{{ $t('accountActivity.resource') }}：</span>{{ formatResource(entry.resource_type) }}<span v-if="entry.resource_id"> / {{ entry.resource_id }}</span></div>
@@ -190,7 +190,7 @@ function rawDetails(entry: ActivityEntry): string {
       </div>
     </div>
 
-    <div v-if="total > 0" class="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+    <div v-if="total > 0" class="flex flex-col gap-3 mt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
       <span>{{ $t('showing', { from: offset + 1, to: Math.min(offset + limit, total), total }) }}</span>
       <div class="flex gap-2">
         <button @click="prevPage" :disabled="offset === 0" class="px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-muted transition-colors disabled:opacity-40">{{ $t('prev') }}</button>

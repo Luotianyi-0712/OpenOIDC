@@ -1397,6 +1397,20 @@ type updateSettingRequest struct {
 	Description string `json:"description"`
 }
 
+type riskPolicyResponse struct {
+	Enabled             bool   `json:"enabled"`
+	BlockedIPs          string `json:"blocked_ips"`
+	BlockedEmails       string `json:"blocked_emails"`
+	BlockedEmailDomains string `json:"blocked_email_domains"`
+}
+
+type updateRiskPolicyRequest struct {
+	Enabled             bool   `json:"enabled"`
+	BlockedIPs          string `json:"blocked_ips"`
+	BlockedEmails       string `json:"blocked_emails"`
+	BlockedEmailDomains string `json:"blocked_email_domains"`
+}
+
 func (h *AdminHandler) ListSettings(w http.ResponseWriter, r *http.Request) {
 	settings, err := h.adminSvc.ListSettings(r.Context())
 	if err != nil {
@@ -1441,6 +1455,56 @@ type githubReleaseResponse struct {
 
 type githubTagResponse struct {
 	Name string `json:"name"`
+}
+
+func (h *AdminHandler) GetRiskPolicy(w http.ResponseWriter, r *http.Request) {
+	value := func(key, fallback string) string {
+		setting, err := h.adminSvc.GetSetting(r.Context(), key)
+		if err != nil {
+			if errors.Is(err, service.ErrNotFound) {
+				return fallback
+			}
+			return fallback
+		}
+		return setting.Value
+	}
+
+	JSON(w, http.StatusOK, riskPolicyResponse{
+		Enabled:             value("risk_policy_enabled", "true") != "false",
+		BlockedIPs:          value("risk_blocked_ips", ""),
+		BlockedEmails:       value("risk_blocked_emails", ""),
+		BlockedEmailDomains: value("risk_blocked_email_domains", ""),
+	})
+}
+
+func (h *AdminHandler) UpdateRiskPolicy(w http.ResponseWriter, r *http.Request) {
+	adminID, err := mw.GetUserID(r.Context())
+	if err != nil {
+		Error(w, http.StatusUnauthorized, "unauthenticated", err.Error())
+		return
+	}
+	var req updateRiskPolicyRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	updates := []struct {
+		key   string
+		value string
+		desc  string
+	}{
+		{"risk_policy_enabled", strconv.FormatBool(req.Enabled), "Enable platform risk blocking on auth entry points"},
+		{"risk_blocked_ips", strings.TrimSpace(req.BlockedIPs), "Blocked IPv4, IPv6, or CIDR list"},
+		{"risk_blocked_emails", strings.TrimSpace(req.BlockedEmails), "Blocked email address list"},
+		{"risk_blocked_email_domains", strings.TrimSpace(req.BlockedEmailDomains), "Blocked email domain list"},
+	}
+	for _, update := range updates {
+		if err := h.adminSvc.UpdateSetting(r.Context(), update.key, update.value, update.desc, adminID); err != nil {
+			mapAdminError(w, err)
+			return
+		}
+	}
+	JSON(w, http.StatusOK, map[string]any{"updated": true})
 }
 
 func (h *AdminHandler) CheckVersionUpdate(w http.ResponseWriter, r *http.Request) {

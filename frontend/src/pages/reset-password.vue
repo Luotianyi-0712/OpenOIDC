@@ -113,6 +113,7 @@ function goLogin() {
       </div>
 
       <form @submit.prevent="onSubmit" class="flex flex-col gap-4">
+        <input type="text" value="" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true" />
         <div>
           <label class="block text-sm font-medium mb-1.5" for="newPwd">{{ $t('resetPassword.newPassword') }}</label>
           <div class="relative">

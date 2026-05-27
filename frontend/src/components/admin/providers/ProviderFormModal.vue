@@ -117,6 +117,7 @@ async function copyText(text: string, field: string) {
         </div>
 
         <form class="flex flex-col gap-5 px-6 py-5" @submit.prevent="emit('submit')">
+          <input type="text" :value="providerKey" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true" />
           <div class="grid gap-3 rounded-lg bg-muted/40 p-3 sm:grid-cols-3">
             <label class="flex items-center gap-3 cursor-pointer">
               <span class="relative inline-flex items-center">
@@ -203,6 +204,7 @@ async function copyText(text: string, field: string) {
                 v-else
                 :value="stringField(field.key)"
                 :type="field.type"
+                :autocomplete="field.type === 'password' ? 'new-password' : undefined"
                 class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10"
                 :placeholder="field.placeholder || fieldLabel(field)"
                 @input="updateStringField(field.key, $event)"

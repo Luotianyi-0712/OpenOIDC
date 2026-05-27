@@ -491,64 +491,107 @@ function roleLabel(role?: string) {
       <Loader2 class="w-5 h-5 animate-spin mr-2" /> {{ $t('loading') }}
     </div>
 
-    <div v-else class="border border-border rounded-xl overflow-x-auto">
-      <table class="w-full min-w-[1080px] text-sm">
-        <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          <tr>
-            <th class="px-4 py-3">{{ $t('adminUsers.user') }}</th>
-            <th class="px-4 py-3">{{ $t('adminUsers.status') }}</th>
-            <th class="px-4 py-3">{{ $t('adminUsers.role') }}</th>
-            <th class="px-4 py-3">{{ $t('adminUsers.securityLevel') }}</th>
-            <th class="px-4 py-3">{{ $t('adminUsers.lastLogin') }}</th>
-            <th class="px-4 py-3">{{ $t('adminUsers.created') }}</th>
-            <th class="px-4 py-3">{{ $t('actions') }}</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          <tr v-if="users.length === 0">
-            <td colspan="7" class="px-4 py-8 text-center text-muted-foreground">{{ $t('adminUsers.noUsers') }}</td>
-          </tr>
-          <tr v-for="user in users" :key="user.id" class="hover:bg-muted/30 transition-colors">
-            <td class="px-4 py-3">
-              <div class="font-medium break-all">{{ user.email }}</div>
-              <div class="text-xs text-muted-foreground font-mono mt-0.5">{{ $t('adminUsers.uid') }} {{ user.uid }}</div>
-              <div class="text-xs text-muted-foreground break-words">{{ user.display_name || $t('adminUsers.noDisplayName') }} · {{ user.email_verified ? $t('adminUsers.emailVerified') : $t('adminUsers.emailUnverified') }}</div>
-            </td>
-            <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="{ 'bg-green-50 text-green-700': user.status === 'active', 'bg-yellow-50 text-yellow-700': user.status === 'suspended', 'bg-red-50 text-red-700': user.status === 'deleted' }">
-                {{ statusLabel(user.status) }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              <span class="text-xs font-medium px-2 py-0.5 rounded-full" :class="{ 'text-white bg-foreground': user.role === 'super_admin', 'text-foreground bg-foreground/10': user.role === 'admin', 'text-muted-foreground bg-muted': !user.role || user.role === 'user' }">
-                {{ roleLabel(user.role) }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-muted-foreground">L{{ user.security_level }}</td>
-            <td class="px-4 py-3 text-muted-foreground whitespace-nowrap">{{ formatDate(user.last_login_at) }}</td>
-            <td class="px-4 py-3 text-muted-foreground whitespace-nowrap">{{ formatDate(user.created_at) }}</td>
-            <td class="px-4 py-3">
-              <div class="flex items-center gap-1 flex-wrap">
-                <button @click="openDetail(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
-                  <Eye class="w-3 h-3" /> {{ $t('adminUsers.view') }}
-                </button>
-                <button @click="openEdit(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
-                  <Pencil class="w-3 h-3" /> {{ $t('edit') }}
-                </button>
-                <button @click="openSecurityLevel(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
-                  <ShieldCheck class="w-3 h-3" /> {{ $t('adminUsers.level') }}
-                </button>
-                <button @click="openResetPassword(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
-                  <KeyRound class="w-3 h-3" /> {{ $t('adminUsers.resetPwd') }}
-                </button>
-                <button @click="confirmDelete(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-destructive/5 transition-colors text-destructive flex items-center gap-1">
-                  <Trash2 class="w-3 h-3" /> {{ $t('delete') }}
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-else>
+      <div class="hidden md:block border border-border rounded-xl overflow-x-auto">
+        <table class="w-full min-w-[1080px] text-sm">
+          <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <tr>
+              <th class="px-4 py-3">{{ $t('adminUsers.user') }}</th>
+              <th class="px-4 py-3">{{ $t('adminUsers.status') }}</th>
+              <th class="px-4 py-3">{{ $t('adminUsers.role') }}</th>
+              <th class="px-4 py-3">{{ $t('adminUsers.securityLevel') }}</th>
+              <th class="px-4 py-3">{{ $t('adminUsers.lastLogin') }}</th>
+              <th class="px-4 py-3">{{ $t('adminUsers.created') }}</th>
+              <th class="px-4 py-3">{{ $t('actions') }}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border">
+            <tr v-if="users.length === 0">
+              <td colspan="7" class="px-4 py-8 text-center text-muted-foreground">{{ $t('adminUsers.noUsers') }}</td>
+            </tr>
+            <tr v-for="user in users" :key="user.id" class="hover:bg-muted/30 transition-colors">
+              <td class="px-4 py-3">
+                <div class="font-medium break-all">{{ user.email }}</div>
+                <div class="text-xs text-muted-foreground font-mono mt-0.5">{{ $t('adminUsers.uid') }} {{ user.uid }}</div>
+                <div class="text-xs text-muted-foreground break-words">{{ user.display_name || $t('adminUsers.noDisplayName') }} · {{ user.email_verified ? $t('adminUsers.emailVerified') : $t('adminUsers.emailUnverified') }}</div>
+              </td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="{ 'bg-green-50 text-green-700': user.status === 'active', 'bg-yellow-50 text-yellow-700': user.status === 'suspended', 'bg-red-50 text-red-700': user.status === 'deleted' }">
+                  {{ statusLabel(user.status) }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <span class="text-xs font-medium px-2 py-0.5 rounded-full" :class="{ 'text-white bg-foreground': user.role === 'super_admin', 'text-foreground bg-foreground/10': user.role === 'admin', 'text-muted-foreground bg-muted': !user.role || user.role === 'user' }">
+                  {{ roleLabel(user.role) }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-muted-foreground">L{{ user.security_level }}</td>
+              <td class="px-4 py-3 text-muted-foreground whitespace-nowrap">{{ formatDate(user.last_login_at) }}</td>
+              <td class="px-4 py-3 text-muted-foreground whitespace-nowrap">{{ formatDate(user.created_at) }}</td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-1 flex-wrap">
+                  <button @click="openDetail(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
+                    <Eye class="w-3 h-3" /> {{ $t('adminUsers.view') }}
+                  </button>
+                  <button @click="openEdit(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
+                    <Pencil class="w-3 h-3" /> {{ $t('edit') }}
+                  </button>
+                  <button @click="openSecurityLevel(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
+                    <ShieldCheck class="w-3 h-3" /> {{ $t('adminUsers.level') }}
+                  </button>
+                  <button @click="openResetPassword(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
+                    <KeyRound class="w-3 h-3" /> {{ $t('adminUsers.resetPwd') }}
+                  </button>
+                  <button @click="confirmDelete(user)" class="text-xs font-medium px-2 py-1 rounded hover:bg-destructive/5 transition-colors text-destructive flex items-center gap-1">
+                    <Trash2 class="w-3 h-3" /> {{ $t('delete') }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="md:hidden space-y-3">
+        <div v-if="users.length === 0" class="border border-border rounded-xl px-4 py-8 text-center text-muted-foreground text-sm">{{ $t('adminUsers.noUsers') }}</div>
+        <div v-for="user in users" :key="user.id" class="border border-border rounded-xl p-4 bg-background space-y-3">
+          <div class="space-y-1">
+            <div class="font-medium text-sm break-all">{{ user.email }}</div>
+            <div class="text-xs text-muted-foreground font-mono break-all">{{ $t('adminUsers.uid') }} {{ user.uid }}</div>
+            <div class="text-xs text-muted-foreground break-words">{{ user.display_name || $t('adminUsers.noDisplayName') }} · {{ user.email_verified ? $t('adminUsers.emailVerified') : $t('adminUsers.emailUnverified') }}</div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="{ 'bg-green-50 text-green-700': user.status === 'active', 'bg-yellow-50 text-yellow-700': user.status === 'suspended', 'bg-red-50 text-red-700': user.status === 'deleted' }">
+              {{ statusLabel(user.status) }}
+            </span>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full" :class="{ 'text-white bg-foreground': user.role === 'super_admin', 'text-foreground bg-foreground/10': user.role === 'admin', 'text-muted-foreground bg-muted': !user.role || user.role === 'user' }">
+              {{ roleLabel(user.role) }}
+            </span>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">L{{ user.security_level }}</span>
+          </div>
+          <div class="grid grid-cols-1 gap-2 text-xs text-muted-foreground">
+            <div><span class="font-medium text-foreground">{{ $t('adminUsers.lastLogin') }}：</span>{{ formatDate(user.last_login_at) }}</div>
+            <div><span class="font-medium text-foreground">{{ $t('adminUsers.created') }}：</span>{{ formatDate(user.created_at) }}</div>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button @click="openDetail(user)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+              <Eye class="w-3 h-3" /> {{ $t('adminUsers.view') }}
+            </button>
+            <button @click="openEdit(user)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+              <Pencil class="w-3 h-3" /> {{ $t('edit') }}
+            </button>
+            <button @click="openSecurityLevel(user)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+              <ShieldCheck class="w-3 h-3" /> {{ $t('adminUsers.level') }}
+            </button>
+            <button @click="openResetPassword(user)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+              <KeyRound class="w-3 h-3" /> {{ $t('adminUsers.resetPwd') }}
+            </button>
+            <button @click="confirmDelete(user)" class="col-span-2 text-xs font-medium px-2 py-2 rounded border border-destructive/30 hover:bg-destructive/5 transition-colors text-destructive flex items-center justify-center gap-1">
+              <Trash2 class="w-3 h-3" /> {{ $t('delete') }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="total > 0" class="flex flex-col gap-3 mt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
@@ -559,8 +602,8 @@ function roleLabel(role?: string) {
       </div>
     </div>
 
-    <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showCreateModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg mx-4 p-6">
+    <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showCreateModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-lg font-semibold">{{ $t('adminUsers.createUserTitle') }}</h2>
           <button @click="showCreateModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
@@ -569,12 +612,12 @@ function roleLabel(role?: string) {
         <form @submit.prevent="createUser" class="flex flex-col gap-4">
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminUsers.emailLabel') }}</label>
-            <input v-model="createForm.email" type="email" required :placeholder="$t('adminUsers.emailPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+            <input v-model="createForm.email" type="email" required autocomplete="username" :placeholder="$t('adminUsers.emailPlaceholder')" class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
           </div>
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminUsers.passwordLabel') }}</label>
             <div class="relative">
-              <input v-model="createForm.password" :type="showCreatePassword ? 'text' : 'password'" required minlength="6" :placeholder="$t('adminUsers.passwordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+              <input v-model="createForm.password" :type="showCreatePassword ? 'text' : 'password'" required minlength="6" autocomplete="new-password" :placeholder="$t('adminUsers.passwordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
               <button
                 type="button"
                 @click="showCreatePassword = !showCreatePassword"
@@ -608,8 +651,8 @@ function roleLabel(role?: string) {
       </div>
     </div>
 
-    <div v-if="showDetailModal && detailUser" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showDetailModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl mx-4 p-6 max-h-[90vh] overflow-y-auto">
+    <div v-if="showDetailModal && detailUser" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showDetailModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl p-5 sm:p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-lg font-semibold">{{ $t('adminUsers.userDetails') }}</h2>
           <button @click="showDetailModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
@@ -631,18 +674,30 @@ function roleLabel(role?: string) {
         </div>
         <div v-if="loadingDetail" class="text-sm text-muted-foreground py-4">{{ $t('loading') }}</div>
         <div v-else-if="detailClients.length === 0" class="text-sm text-muted-foreground py-4 border border-dashed border-border rounded-lg text-center">{{ $t('adminUsers.noUserClients') }}</div>
-        <div v-else class="border border-border rounded-lg overflow-x-auto">
-          <table class="w-full min-w-[720px] text-sm">
-            <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminClients.clientName') }}</th><th class="px-3 py-2">{{ $t('adminClients.clientId') }}</th><th class="px-3 py-2">{{ $t('adminClients.minSecurityLevel') }}</th><th class="px-3 py-2">{{ $t('adminUsers.status') }}</th></tr></thead>
-            <tbody class="divide-y divide-border">
-              <tr v-for="client in detailClients" :key="client.id">
-                <td class="px-3 py-2 font-medium">{{ client.client_name }}</td>
-                <td class="px-3 py-2 font-mono text-xs text-muted-foreground">{{ client.client_id }}</td>
-                <td class="px-3 py-2">L{{ client.min_security_level }}</td>
-                <td class="px-3 py-2">{{ client.is_active ? $t('adminProviders.enabled') : $t('adminProviders.disabled') }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-else>
+          <div class="hidden md:block border border-border rounded-lg overflow-x-auto">
+            <table class="w-full min-w-[720px] text-sm">
+              <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminClients.clientName') }}</th><th class="px-3 py-2">{{ $t('adminClients.clientId') }}</th><th class="px-3 py-2">{{ $t('adminClients.minSecurityLevel') }}</th><th class="px-3 py-2">{{ $t('adminUsers.status') }}</th></tr></thead>
+              <tbody class="divide-y divide-border">
+                <tr v-for="client in detailClients" :key="client.id">
+                  <td class="px-3 py-2 font-medium">{{ client.client_name }}</td>
+                  <td class="px-3 py-2 font-mono text-xs text-muted-foreground">{{ client.client_id }}</td>
+                  <td class="px-3 py-2">L{{ client.min_security_level }}</td>
+                  <td class="px-3 py-2">{{ client.is_active ? $t('adminProviders.enabled') : $t('adminProviders.disabled') }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="md:hidden space-y-2">
+            <div v-for="client in detailClients" :key="client.id" class="rounded-lg border border-border p-3 text-xs space-y-2">
+              <div class="font-medium text-sm break-words">{{ client.client_name }}</div>
+              <div class="font-mono text-muted-foreground break-all">{{ client.client_id }}</div>
+              <div class="flex flex-wrap gap-2">
+                <span class="px-2 py-0.5 rounded-full bg-muted">L{{ client.min_security_level }}</span>
+                <span class="px-2 py-0.5 rounded-full" :class="client.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'">{{ client.is_active ? $t('adminProviders.enabled') : $t('adminProviders.disabled') }}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="mt-6">
@@ -652,25 +707,40 @@ function roleLabel(role?: string) {
           </div>
           <div v-if="passkeysLoading" class="text-sm text-muted-foreground py-4">{{ $t('loading') }}</div>
           <div v-else-if="detailPasskeys.length === 0" class="text-sm text-muted-foreground py-3 border border-dashed border-border rounded-lg text-center">{{ $t('adminUserDetail.noPasskeys') }}</div>
-          <div v-else class="border border-border rounded-lg overflow-x-auto">
-            <table class="w-full min-w-[720px] text-sm">
-              <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminUserDetail.name') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.createdAt') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.lastUsed') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.transports') }}</th><th class="px-3 py-2">{{ $t('actions') }}</th></tr></thead>
-              <tbody class="divide-y divide-border">
-                <tr v-for="passkey in detailPasskeys" :key="passkey.id">
-                  <td class="px-3 py-2 font-medium">{{ passkey.name || passkey.id }}</td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(passkey.created_at) }}</td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ passkey.last_used_at ? formatDate(passkey.last_used_at) : $t('adminUserDetail.neverUsed') }}</td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ passkey.transports?.length ? passkey.transports.join(', ') : '-' }}</td>
-                  <td class="px-3 py-2">
-                    <button
-                      @click="deleteUserPasskey(passkey)"
-                      :disabled="actionLoading === `passkey:${passkey.id}`"
-                      class="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
-                    >{{ $t('adminUserDetail.deletePasskey') }}</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-else>
+            <div class="hidden md:block border border-border rounded-lg overflow-x-auto">
+              <table class="w-full min-w-[720px] text-sm">
+                <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminUserDetail.name') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.createdAt') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.lastUsed') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.transports') }}</th><th class="px-3 py-2">{{ $t('actions') }}</th></tr></thead>
+                <tbody class="divide-y divide-border">
+                  <tr v-for="passkey in detailPasskeys" :key="passkey.id">
+                    <td class="px-3 py-2 font-medium">{{ passkey.name || passkey.id }}</td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(passkey.created_at) }}</td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ passkey.last_used_at ? formatDate(passkey.last_used_at) : $t('adminUserDetail.neverUsed') }}</td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ passkey.transports?.length ? passkey.transports.join(', ') : '-' }}</td>
+                    <td class="px-3 py-2">
+                      <button
+                        @click="deleteUserPasskey(passkey)"
+                        :disabled="actionLoading === `passkey:${passkey.id}`"
+                        class="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
+                      >{{ $t('adminUserDetail.deletePasskey') }}</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="md:hidden space-y-2">
+              <div v-for="passkey in detailPasskeys" :key="passkey.id" class="rounded-lg border border-border p-3 text-xs space-y-2">
+                <div class="font-medium text-sm break-words">{{ passkey.name || passkey.id }}</div>
+                <div class="text-muted-foreground"><span class="font-medium text-foreground">{{ $t('adminUserDetail.createdAt') }}：</span>{{ formatDate(passkey.created_at) }}</div>
+                <div class="text-muted-foreground"><span class="font-medium text-foreground">{{ $t('adminUserDetail.lastUsed') }}：</span>{{ passkey.last_used_at ? formatDate(passkey.last_used_at) : $t('adminUserDetail.neverUsed') }}</div>
+                <div class="text-muted-foreground break-words"><span class="font-medium text-foreground">{{ $t('adminUserDetail.transports') }}：</span>{{ passkey.transports?.length ? passkey.transports.join(', ') : '-' }}</div>
+                <button
+                  @click="deleteUserPasskey(passkey)"
+                  :disabled="actionLoading === `passkey:${passkey.id}`"
+                  class="w-full px-3 py-2 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 disabled:opacity-50"
+                >{{ $t('adminUserDetail.deletePasskey') }}</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -678,24 +748,38 @@ function roleLabel(role?: string) {
         <div class="mt-6">
           <h3 class="font-medium mb-2">{{ $t('adminUserDetail.sessions') }}</h3>
           <div v-if="detailSessions.length === 0" class="text-sm text-muted-foreground py-3 border border-dashed border-border rounded-lg text-center">{{ $t('adminUserDetail.noSessions') }}</div>
-          <div v-else class="border border-border rounded-lg overflow-x-auto">
-            <table class="w-full min-w-[720px] text-sm">
-              <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminUserDetail.ip') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.userAgent') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.createdAt') }}</th><th class="px-3 py-2">{{ $t('actions') }}</th></tr></thead>
-              <tbody class="divide-y divide-border">
-                <tr v-for="sess in detailSessions" :key="sess.id">
-                  <td class="px-3 py-2 font-mono text-xs">{{ sess.ip || '-' }}</td>
-                  <td class="px-3 py-2 text-xs truncate max-w-[200px]">{{ sess.user_agent || '-' }}</td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(sess.created_at) }}</td>
-                  <td class="px-3 py-2">
-                    <button
-                      @click="revokeSession(sess)"
-                      :disabled="actionLoading === `session:${sess.id}`"
-                      class="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
-                    >{{ $t('adminUserDetail.revokeSession') }}</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-else>
+            <div class="hidden md:block border border-border rounded-lg overflow-x-auto">
+              <table class="w-full min-w-[720px] text-sm">
+                <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminUserDetail.ip') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.userAgent') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.createdAt') }}</th><th class="px-3 py-2">{{ $t('actions') }}</th></tr></thead>
+                <tbody class="divide-y divide-border">
+                  <tr v-for="sess in detailSessions" :key="sess.id">
+                    <td class="px-3 py-2 font-mono text-xs">{{ sess.ip || '-' }}</td>
+                    <td class="px-3 py-2 text-xs truncate max-w-[200px]">{{ sess.user_agent || '-' }}</td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(sess.created_at) }}</td>
+                    <td class="px-3 py-2">
+                      <button
+                        @click="revokeSession(sess)"
+                        :disabled="actionLoading === `session:${sess.id}`"
+                        class="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
+                      >{{ $t('adminUserDetail.revokeSession') }}</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="md:hidden space-y-2">
+              <div v-for="sess in detailSessions" :key="sess.id" class="rounded-lg border border-border p-3 text-xs space-y-2">
+                <div class="font-mono break-all">{{ sess.ip || '-' }}</div>
+                <div class="text-muted-foreground break-words">{{ sess.user_agent || '-' }}</div>
+                <div class="text-muted-foreground"><span class="font-medium text-foreground">{{ $t('adminUserDetail.createdAt') }}：</span>{{ formatDate(sess.created_at) }}</div>
+                <button
+                  @click="revokeSession(sess)"
+                  :disabled="actionLoading === `session:${sess.id}`"
+                  class="w-full px-3 py-2 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 disabled:opacity-50"
+                >{{ $t('adminUserDetail.revokeSession') }}</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -703,31 +787,50 @@ function roleLabel(role?: string) {
         <div class="mt-6">
           <h3 class="font-medium mb-2">{{ $t('adminUserDetail.bindings') }}</h3>
           <div v-if="detailBindings.length === 0" class="text-sm text-muted-foreground py-3 border border-dashed border-border rounded-lg text-center">{{ $t('adminUserDetail.noBindings') }}</div>
-          <div v-else class="border border-border rounded-lg overflow-x-auto">
-            <table class="w-full min-w-[720px] text-sm">
-              <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminUserDetail.provider') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.providerName') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.authStatus') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.boundAt') }}</th><th class="px-3 py-2">{{ $t('actions') }}</th></tr></thead>
-              <tbody class="divide-y divide-border">
-                <tr v-for="binding in detailBindings" :key="binding.id">
-                  <td class="px-3 py-2 font-mono text-xs">{{ binding.provider }}</td>
-                  <td class="px-3 py-2 text-xs">
-                    <div>{{ binding.provider_name || binding.provider_uid }}</div>
-                    <div class="text-muted-foreground">{{ binding.provider_email || '-' }}</div>
-                  </td>
-                  <td class="px-3 py-2 text-xs">
-                    <div>{{ binding.last_auth_status || binding.status }}</div>
-                    <div v-if="binding.last_auth_error" class="text-destructive truncate max-w-[160px]">{{ binding.last_auth_error }}</div>
-                  </td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(binding.bound_at) }}</td>
-                  <td class="px-3 py-2">
-                    <button
-                      @click="unbindSocial(binding)"
-                      :disabled="actionLoading === `binding:${binding.provider}`"
-                      class="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
-                    >{{ $t('adminUserDetail.unbindSocial') }}</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-else>
+            <div class="hidden md:block border border-border rounded-lg overflow-x-auto">
+              <table class="w-full min-w-[720px] text-sm">
+                <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminUserDetail.provider') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.providerName') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.authStatus') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.boundAt') }}</th><th class="px-3 py-2">{{ $t('actions') }}</th></tr></thead>
+                <tbody class="divide-y divide-border">
+                  <tr v-for="binding in detailBindings" :key="binding.id">
+                    <td class="px-3 py-2 font-mono text-xs">{{ binding.provider }}</td>
+                    <td class="px-3 py-2 text-xs">
+                      <div>{{ binding.provider_name || binding.provider_uid }}</div>
+                      <div class="text-muted-foreground">{{ binding.provider_email || '-' }}</div>
+                    </td>
+                    <td class="px-3 py-2 text-xs">
+                      <div>{{ binding.last_auth_status || binding.status }}</div>
+                      <div v-if="binding.last_auth_error" class="text-destructive truncate max-w-[160px]">{{ binding.last_auth_error }}</div>
+                    </td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(binding.bound_at) }}</td>
+                    <td class="px-3 py-2">
+                      <button
+                        @click="unbindSocial(binding)"
+                        :disabled="actionLoading === `binding:${binding.provider}`"
+                        class="text-xs font-medium text-destructive hover:underline disabled:opacity-50"
+                      >{{ $t('adminUserDetail.unbindSocial') }}</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="md:hidden space-y-2">
+              <div v-for="binding in detailBindings" :key="binding.id" class="rounded-lg border border-border p-3 text-xs space-y-2">
+                <div class="flex flex-wrap gap-2">
+                  <span class="px-2 py-0.5 rounded-full bg-muted font-mono">{{ binding.provider }}</span>
+                  <span class="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{{ binding.last_auth_status || binding.status }}</span>
+                </div>
+                <div class="break-words">{{ binding.provider_name || binding.provider_uid }}</div>
+                <div class="text-muted-foreground break-all">{{ binding.provider_email || '-' }}</div>
+                <div v-if="binding.last_auth_error" class="text-destructive break-words">{{ binding.last_auth_error }}</div>
+                <div class="text-muted-foreground"><span class="font-medium text-foreground">{{ $t('adminUserDetail.boundAt') }}：</span>{{ formatDate(binding.bound_at) }}</div>
+                <button
+                  @click="unbindSocial(binding)"
+                  :disabled="actionLoading === `binding:${binding.provider}`"
+                  class="w-full px-3 py-2 text-xs font-medium text-destructive border border-destructive/30 rounded-lg hover:bg-destructive/5 disabled:opacity-50"
+                >{{ $t('adminUserDetail.unbindSocial') }}</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -735,58 +838,94 @@ function roleLabel(role?: string) {
         <div class="mt-6">
           <h3 class="font-medium mb-2">{{ $t('adminUserDetail.riskReports') }}</h3>
           <div v-if="detailRiskReports.length === 0" class="text-sm text-muted-foreground py-3 border border-dashed border-border rounded-lg text-center">{{ $t('adminUserDetail.noRiskReports') }}</div>
-          <div v-else class="border border-border rounded-lg overflow-x-auto">
-            <table class="w-full min-w-[720px] text-sm">
-              <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminRisk.category') }}</th><th class="px-3 py-2">{{ $t('adminRisk.reason') }}</th><th class="px-3 py-2">{{ $t('adminUsers.status') }}</th><th class="px-3 py-2">{{ $t('adminRisk.time') }}</th><th class="px-3 py-2">{{ $t('actions') }}</th></tr></thead>
-              <tbody class="divide-y divide-border">
-                <tr v-for="report in detailRiskReports" :key="report.id">
-                  <td class="px-3 py-2 text-xs">{{ report.category }}</td>
-                  <td class="px-3 py-2 text-xs">{{ report.reason }}</td>
-                  <td class="px-3 py-2 text-xs">{{ report.status }}</td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(report.created_at) }}</td>
-                  <td class="px-3 py-2">
-                    <div v-if="report.status === 'pending'" class="flex gap-2">
-                      <button
-                        @click="handleRiskReport(report, 'confirm')"
-                        :disabled="actionLoading === `risk:${report.id}:confirm`"
-                        class="text-xs font-medium hover:underline disabled:opacity-50"
-                      >{{ $t('adminUserDetail.confirmRisk') }}</button>
-                      <button
-                        @click="handleRiskReport(report, 'dismiss')"
-                        :disabled="actionLoading === `risk:${report.id}:dismiss`"
-                        class="text-xs font-medium text-muted-foreground hover:underline disabled:opacity-50"
-                      >{{ $t('adminUserDetail.dismissRisk') }}</button>
-                    </div>
-                    <span v-else class="text-xs text-muted-foreground">-</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-else>
+            <div class="hidden md:block border border-border rounded-lg overflow-x-auto">
+              <table class="w-full min-w-[720px] text-sm">
+                <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminRisk.category') }}</th><th class="px-3 py-2">{{ $t('adminRisk.reason') }}</th><th class="px-3 py-2">{{ $t('adminUsers.status') }}</th><th class="px-3 py-2">{{ $t('adminRisk.time') }}</th><th class="px-3 py-2">{{ $t('actions') }}</th></tr></thead>
+                <tbody class="divide-y divide-border">
+                  <tr v-for="report in detailRiskReports" :key="report.id">
+                    <td class="px-3 py-2 text-xs">{{ report.category }}</td>
+                    <td class="px-3 py-2 text-xs">{{ report.reason }}</td>
+                    <td class="px-3 py-2 text-xs">{{ report.status }}</td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(report.created_at) }}</td>
+                    <td class="px-3 py-2">
+                      <div v-if="report.status === 'pending'" class="flex gap-2">
+                        <button
+                          @click="handleRiskReport(report, 'confirm')"
+                          :disabled="actionLoading === `risk:${report.id}:confirm`"
+                          class="text-xs font-medium hover:underline disabled:opacity-50"
+                        >{{ $t('adminUserDetail.confirmRisk') }}</button>
+                        <button
+                          @click="handleRiskReport(report, 'dismiss')"
+                          :disabled="actionLoading === `risk:${report.id}:dismiss`"
+                          class="text-xs font-medium text-muted-foreground hover:underline disabled:opacity-50"
+                        >{{ $t('adminUserDetail.dismissRisk') }}</button>
+                      </div>
+                      <span v-else class="text-xs text-muted-foreground">-</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="md:hidden space-y-2">
+              <div v-for="report in detailRiskReports" :key="report.id" class="rounded-lg border border-border p-3 text-xs space-y-2">
+                <div class="flex flex-wrap gap-2">
+                  <span class="px-2 py-0.5 rounded-full bg-muted">{{ report.category }}</span>
+                  <span class="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{{ report.status }}</span>
+                </div>
+                <div class="break-words">{{ report.reason }}</div>
+                <div class="text-muted-foreground"><span class="font-medium text-foreground">{{ $t('adminRisk.time') }}：</span>{{ formatDate(report.created_at) }}</div>
+                <div v-if="report.status === 'pending'" class="grid grid-cols-2 gap-2">
+                  <button
+                    @click="handleRiskReport(report, 'confirm')"
+                    :disabled="actionLoading === `risk:${report.id}:confirm`"
+                    class="px-3 py-2 text-xs font-medium border border-border rounded-lg hover:bg-muted disabled:opacity-50"
+                  >{{ $t('adminUserDetail.confirmRisk') }}</button>
+                  <button
+                    @click="handleRiskReport(report, 'dismiss')"
+                    :disabled="actionLoading === `risk:${report.id}:dismiss`"
+                    class="px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-lg hover:bg-muted disabled:opacity-50"
+                  >{{ $t('adminUserDetail.dismissRisk') }}</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <!-- Audit Logs -->
         <div class="mt-6">
           <h3 class="font-medium mb-2">{{ $t('adminUserDetail.auditLogs') }}</h3>
           <div v-if="detailAuditLogs.length === 0" class="text-sm text-muted-foreground py-3 border border-dashed border-border rounded-lg text-center">{{ $t('adminUserDetail.noAuditLogs') }}</div>
-          <div v-else class="border border-border rounded-lg overflow-x-auto">
-            <table class="w-full min-w-[720px] text-sm">
-              <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminUserDetail.action') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.resource') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.details') }}</th><th class="px-3 py-2">{{ $t('adminRisk.time') }}</th></tr></thead>
-              <tbody class="divide-y divide-border">
-                <tr v-for="log in detailAuditLogs" :key="log.id">
-                  <td class="px-3 py-2 text-xs">{{ log.action }}</td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ log.resource_type || '-' }}</td>
-                  <td class="px-3 py-2 text-xs truncate max-w-[220px]">{{ log.details_text || '-' }}</td>
-                  <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(log.created_at) }}</td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-else>
+            <div class="hidden md:block border border-border rounded-lg overflow-x-auto">
+              <table class="w-full min-w-[720px] text-sm">
+                <thead class="bg-muted/50 text-left text-xs text-muted-foreground"><tr><th class="px-3 py-2">{{ $t('adminUserDetail.action') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.resource') }}</th><th class="px-3 py-2">{{ $t('adminUserDetail.details') }}</th><th class="px-3 py-2">{{ $t('adminRisk.time') }}</th></tr></thead>
+                <tbody class="divide-y divide-border">
+                  <tr v-for="log in detailAuditLogs" :key="log.id">
+                    <td class="px-3 py-2 text-xs">{{ log.action }}</td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ log.resource_type || '-' }}</td>
+                    <td class="px-3 py-2 text-xs truncate max-w-[220px]">{{ log.details_text || '-' }}</td>
+                    <td class="px-3 py-2 text-xs text-muted-foreground">{{ formatDate(log.created_at) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="md:hidden space-y-2">
+              <div v-for="log in detailAuditLogs" :key="log.id" class="rounded-lg border border-border p-3 text-xs space-y-2">
+                <div class="flex flex-wrap gap-2">
+                  <span class="px-2 py-0.5 rounded-full bg-muted break-all">{{ log.action }}</span>
+                  <span class="px-2 py-0.5 rounded-full bg-muted text-muted-foreground break-all">{{ log.resource_type || '-' }}</span>
+                </div>
+                <div class="text-muted-foreground break-words">{{ log.details_text || '-' }}</div>
+                <div class="text-muted-foreground"><span class="font-medium text-foreground">{{ $t('adminRisk.time') }}：</span>{{ formatDate(log.created_at) }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg mx-4 p-6">
+    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-lg font-semibold">{{ $t('adminUsers.editUser') }}</h2>
           <button @click="showModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
@@ -838,8 +977,8 @@ function roleLabel(role?: string) {
       </div>
     </div>
 
-    <div v-if="showSecurityModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showSecurityModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showSecurityModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showSecurityModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-lg font-semibold">{{ $t('adminUsers.overrideSecurityLevel') }}</h2>
           <button @click="showSecurityModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
@@ -860,8 +999,8 @@ function roleLabel(role?: string) {
       </div>
     </div>
 
-    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showDeleteModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showDeleteModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-2">{{ $t('adminUsers.deleteUser') }}</h2>
         <p class="text-sm text-muted-foreground mb-5">{{ $t('adminUsers.deleteConfirm', { email: deletingUser?.email || '' }) }}</p>
         <div class="flex justify-end gap-2">
@@ -873,8 +1012,8 @@ function roleLabel(role?: string) {
       </div>
     </div>
 
-    <div v-if="showResetPasswordModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showResetPasswordModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showResetPasswordModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showResetPasswordModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-2">
           <h2 class="text-lg font-semibold">{{ $t('adminUsers.resetPassword') }}</h2>
           <button @click="showResetPasswordModal = false" class="text-muted-foreground hover:text-foreground"><X class="w-5 h-5" /></button>
@@ -884,10 +1023,11 @@ function roleLabel(role?: string) {
           {{ resetPasswordError }}
         </div>
         <form @submit.prevent="resetPassword" class="flex flex-col gap-4">
+          <input type="text" :value="resetPasswordUser?.email || ''" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true" />
           <div>
             <label class="block text-sm font-medium mb-1.5">{{ $t('adminUsers.newPassword') }}</label>
             <div class="relative">
-              <input v-model="resetPasswordForm.new_password" :type="showResetPassword ? 'text' : 'password'" required :minlength="policy.min_length" :placeholder="$t('adminUsers.newPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
+              <input v-model="resetPasswordForm.new_password" :type="showResetPassword ? 'text' : 'password'" required :minlength="policy.min_length" autocomplete="new-password" :placeholder="$t('adminUsers.newPasswordPlaceholder')" class="w-full px-3 pr-10 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10" />
               <button
                 type="button"
                 @click="showResetPassword = !showResetPassword"

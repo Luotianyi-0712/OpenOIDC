@@ -375,6 +375,7 @@ function formatPasskeyDate(iso: string | null) {
         <KeyRound class="w-4 h-4" /> {{ $t('profile.changePassword') }}
       </h3>
       <form @submit.prevent="changePassword" class="space-y-4 max-w-md">
+        <input type="text" :value="auth.user?.email || ''" autocomplete="username" class="hidden" tabindex="-1" aria-hidden="true" />
         <div>
           <label class="block text-sm font-medium mb-1.5" for="oldPassword">{{ $t('profile.currentPassword') }}</label>
           <div class="relative">

@@ -515,7 +515,7 @@ function formatValue(cond: RuleCondition) {
       {{ $t('adminRules.noRules') }}
     </div>
 
-    <div v-else class="border border-border rounded-xl overflow-x-auto">
+    <div v-else class="hidden md:block border border-border rounded-xl overflow-x-auto">
       <table class="w-full min-w-[860px] text-sm">
         <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
           <tr>
@@ -556,6 +556,31 @@ function formatValue(cond: RuleCondition) {
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div v-if="rules.length > 0" class="md:hidden space-y-3">
+      <div v-for="rule in rules" :key="rule.id" class="border border-border rounded-xl p-4 bg-background space-y-3">
+        <div>
+          <div class="font-medium text-sm break-words">{{ rule.name }}</div>
+          <div class="text-xs text-muted-foreground break-words">{{ rule.description }}</div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-foreground/10">L{{ rule.level }}</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">{{ $t('adminRules.priority') }} {{ rule.priority }}</span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="rule.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'">
+            {{ rule.is_active ? $t('adminProviders.enabled') : $t('adminProviders.disabled') }}
+          </span>
+        </div>
+        <div class="text-xs text-muted-foreground break-words"><span class="font-medium text-foreground">{{ $t('adminRules.conditions') }}：</span>{{ conditionSummary(rule) }}</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="openEdit(rule)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+            <Pencil class="w-3 h-3" /> {{ $t('edit') }}
+          </button>
+          <button @click="confirmDelete(rule)" class="text-xs font-medium px-2 py-2 rounded border border-destructive/30 hover:bg-destructive/5 transition-colors text-destructive flex items-center justify-center gap-1">
+            <Trash2 class="w-3 h-3" /> {{ $t('delete') }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showModal = false">
@@ -673,9 +698,9 @@ function formatValue(cond: RuleCondition) {
             <input type="checkbox" v-model="form.is_active" class="rounded border-border" /> {{ $t('adminRules.active') }}
           </label>
 
-          <div class="flex justify-end gap-2 mt-2">
-            <button type="button" @click="showModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
-            <button type="submit" :disabled="saving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+          <div class="flex flex-col-reverse gap-2 mt-2 sm:flex-row sm:justify-end">
+            <button type="button" @click="showModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">{{ $t('cancel') }}</button>
+            <button type="submit" :disabled="saving" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto">
               <Loader2 v-if="saving" class="w-4 h-4 animate-spin" /> {{ isCreate ? $t('adminRules.createRule') : $t('save') }}
             </button>
           </div>
@@ -683,13 +708,13 @@ function formatValue(cond: RuleCondition) {
       </div>
     </div>
 
-    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showDeleteModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm mx-4 p-6">
+    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showDeleteModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-lg font-semibold mb-2">{{ $t('adminRules.deleteRule') }}</h2>
         <p class="text-sm text-muted-foreground mb-5">{{ $t('adminRules.deleteConfirm') }}</p>
-        <div class="flex justify-end gap-2">
-          <button @click="showDeleteModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
-          <button @click="deleteRule" :disabled="deleting" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 flex items-center gap-2">
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button @click="showDeleteModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">{{ $t('cancel') }}</button>
+          <button @click="deleteRule" :disabled="deleting" class="bg-destructive text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto">
             <Loader2 v-if="deleting" class="w-4 h-4 animate-spin" /> {{ $t('delete') }}
           </button>
         </div>

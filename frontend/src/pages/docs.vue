@@ -526,8 +526,8 @@ function scrollTo(id: string) {
             {{ $t('docs.scopesTitle') }}
           </h2>
           <p class="text-muted-foreground leading-relaxed mb-6">{{ $t('docs.scopesDesc') }}</p>
-          <div class="rounded-xl border border-border overflow-hidden">
-            <table class="w-full text-sm">
+          <div class="rounded-xl border border-border overflow-x-auto">
+            <table class="w-full min-w-[520px] text-sm">
               <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 <tr>
                   <th class="px-5 py-3">Scope</th>

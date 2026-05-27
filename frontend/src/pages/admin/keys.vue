@@ -59,12 +59,12 @@ function formatDate(d: string) {
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
       <h2 class="text-lg font-semibold">{{ $t('adminKeys.title') }}</h2>
       <button
         @click="showRotateModal = true"
         :disabled="rotating"
-        class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+        class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto"
       >
         <RefreshCw class="w-4 h-4" :class="rotating ? 'animate-spin' : ''" />
         {{ $t('adminKeys.rotate') }}
@@ -79,44 +79,65 @@ function formatDate(d: string) {
       <Loader2 class="w-5 h-5 animate-spin mr-2" /> {{ $t('loading') }}
     </div>
 
-    <div v-else class="border border-border rounded-xl overflow-x-auto">
-      <table class="w-full min-w-[640px] text-sm">
-        <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          <tr>
-            <th class="px-4 py-3">{{ $t('adminKeys.keyId') }}</th>
-            <th class="px-4 py-3">{{ $t('adminKeys.algorithm') }}</th>
-            <th class="px-4 py-3">{{ $t('adminUsers.status') }}</th>
-            <th class="px-4 py-3">{{ $t('adminKeys.created') }}</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          <tr v-if="keys.length === 0">
-            <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">{{ $t('adminKeys.noKeys') }}</td>
-          </tr>
-          <tr v-for="key in keys" :key="key.id" class="hover:bg-muted/30 transition-colors">
-            <td class="px-4 py-3 font-mono text-xs">{{ key.key_id }}</td>
-            <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted">
-                {{ key.algorithm }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                :class="key.is_current ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'"
-              >
-                {{ key.is_current ? $t('adminKeys.current') : $t('adminKeys.retired') }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-muted-foreground">{{ formatDate(key.created_at) }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-else>
+      <div class="hidden md:block border border-border rounded-xl overflow-hidden">
+        <table class="w-full text-sm table-fixed">
+          <thead class="bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <tr>
+              <th class="px-4 py-3">{{ $t('adminKeys.keyId') }}</th>
+              <th class="px-4 py-3 w-32">{{ $t('adminKeys.algorithm') }}</th>
+              <th class="px-4 py-3 w-32">{{ $t('adminUsers.status') }}</th>
+              <th class="px-4 py-3 w-44">{{ $t('adminKeys.created') }}</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-border">
+            <tr v-if="keys.length === 0">
+              <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">{{ $t('adminKeys.noKeys') }}</td>
+            </tr>
+            <tr v-for="key in keys" :key="key.id" class="hover:bg-muted/30 transition-colors">
+              <td class="px-4 py-3 font-mono text-xs break-all">{{ key.key_id }}</td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted">
+                  {{ key.algorithm }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                  :class="key.is_current ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'"
+                >
+                  {{ key.is_current ? $t('adminKeys.current') : $t('adminKeys.retired') }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-muted-foreground text-xs">{{ formatDate(key.created_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="md:hidden space-y-3">
+        <div v-if="keys.length === 0" class="border border-border rounded-xl px-4 py-8 text-center text-muted-foreground text-sm">{{ $t('adminKeys.noKeys') }}</div>
+        <div v-for="key in keys" :key="key.id" class="border border-border rounded-xl p-4 bg-background space-y-3">
+          <div class="font-mono text-xs break-all">{{ key.key_id }}</div>
+          <div class="flex flex-wrap gap-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted">
+              {{ key.algorithm }}
+            </span>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+              :class="key.is_current ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'"
+            >
+              {{ key.is_current ? $t('adminKeys.current') : $t('adminKeys.retired') }}
+            </span>
+          </div>
+          <div class="text-xs text-muted-foreground">{{ $t('adminKeys.created') }}：{{ formatDate(key.created_at) }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- Rotate Confirm Modal -->
-    <div v-if="showRotateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="showRotateModal = false">
-      <div class="bg-white rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
+    <div v-if="showRotateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4 py-4" @click.self="showRotateModal = false">
+      <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div class="flex items-start gap-3 mb-4">
           <AlertTriangle class="w-5 h-5 text-yellow-600 mt-0.5" />
           <div>
@@ -124,9 +145,9 @@ function formatDate(d: string) {
             <p class="text-sm text-muted-foreground mt-1">{{ $t('adminKeys.rotateConfirm') }}</p>
           </div>
         </div>
-        <div class="flex justify-end gap-2">
-          <button @click="showRotateModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">{{ $t('cancel') }}</button>
-          <button @click="doRotate" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors">{{ $t('confirm') }}</button>
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button @click="showRotateModal = false" class="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors w-full sm:w-auto">{{ $t('cancel') }}</button>
+          <button @click="doRotate" class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors w-full sm:w-auto">{{ $t('confirm') }}</button>
         </div>
       </div>
     </div>

@@ -162,7 +162,7 @@ async function onSubmit() {
               v-model="email"
               type="email"
               required
-              autocomplete="email"
+              autocomplete="username"
               placeholder="name@example.com"
               :readonly="requiresRegisterCode && codeSent"
               class="w-full pl-9.5 pr-3.5 py-2.5 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 focus:border-foreground transition-all disabled:opacity-60 read-only:bg-muted/30"

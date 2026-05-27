@@ -39,7 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isSuperAdmin = computed(() => user.value?.role === 'super_admin')
   const isDeveloper = computed(() => canShowDeveloperConsole.value)
   const canCreateDeveloperApp = computed(() => developerStatus.value?.can_create || false)
-  const canShowDeveloperConsole = computed(() => developerStatus.value?.can_access || false)
+  const canShowDeveloperConsole = computed(() => !!user.value)
 
   async function fetchUser() {
     try {
