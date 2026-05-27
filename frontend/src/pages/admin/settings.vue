@@ -382,7 +382,7 @@ async function deleteAlias(id: string) {
         <div class="grid gap-3 sm:grid-cols-2">
           <div class="flex items-center justify-between rounded-lg border border-border bg-white px-4 py-3">
             <span class="text-sm text-muted-foreground">{{ $t('adminSettings.currentVersion') }}</span>
-            <code class="text-sm font-mono font-semibold">{{ publicConfigLoaded ? publicSettings.version : 'v1.12' }}</code>
+            <code class="text-sm font-mono font-semibold">{{ publicConfigLoaded ? publicSettings.version : 'v1.13' }}</code>
           </div>
           <div v-if="versionCheck" class="flex items-center justify-between rounded-lg border border-border bg-white px-4 py-3">
             <span class="text-sm text-muted-foreground">{{ $t('adminSettings.latestVersion') }}</span>

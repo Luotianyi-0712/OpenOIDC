@@ -28,6 +28,9 @@ func (r *PasskeyRepo) Create(ctx context.Context, cred *domain.PasskeyCredential
 	if cred.CreatedAt.IsZero() {
 		cred.CreatedAt = time.Now().UTC()
 	}
+	if cred.Transport == nil {
+		cred.Transport = []string{}
+	}
 	transportJSON, _ := json.Marshal(cred.Transport)
 	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO passkey_credentials

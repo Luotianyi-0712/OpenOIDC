@@ -195,7 +195,7 @@ func (r *BindingRepo) SoftUnbind(ctx context.Context, userID uuid.UUID, provider
 	res, err := r.db.ExecContext(ctx, `
 		UPDATE social_bindings
 		SET status = ?, unbound_at = ?, unbind_reason = ?,
-			access_token = NULL, refresh_token = NULL, token_expiry = NULL, token_type = NULL, token_scopes = NULL,
+			access_token = NULL, refresh_token = NULL, token_expiry = NULL, token_type = NULL, token_scopes = '[]',
 			updated_at = ?
 		WHERE user_id = ? AND provider = ? AND status = ?`,
 		domain.SocialBindingStatusUserUnbound, now, reason, now,

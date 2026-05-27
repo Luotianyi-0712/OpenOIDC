@@ -1,6 +1,6 @@
 # OIDC 通用认证平台
 
-当前版本：**v1.12**
+当前版本：**v1.13**
 
 一个自托管的、面向开发者的通用身份认证平台。在标准 OpenID Connect / OAuth 2.0 之上，引入「账号置信等级（Trust Level）」模型：用户在本平台通过邮箱注册，再绑定 GitHub、Gitee、GitLab、Discord、Google、Microsoft、Apple、Telegram、QQ、微信、手机号等第三方账号来提升自己的置信等级；其他业务系统只需要对接本平台一次，通过设置「准入置信等级 + 附加条件」即可获得低成本的风控与准入控制能力。
 
@@ -91,7 +91,7 @@ ghcr.io/luotianyi-0712/openoidc:latest
 如需固定版本，可以指定：
 
 ```bash
-OIDC_IMAGE=ghcr.io/luotianyi-0712/openoidc:v1.12 docker compose up -d
+OIDC_IMAGE=ghcr.io/luotianyi-0712/openoidc:v1.13 docker compose up -d
 ```
 
 Docker 部署默认只暴露应用端口 `8080`；PostgreSQL 和 Redis 不映射到宿主机，只能被 Compose 内网中的应用容器访问。

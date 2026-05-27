@@ -24,6 +24,15 @@ func NewUserRepo(db *sql.DB) *UserRepo {
 const userSelectColumns = `id, uid, email, email_verified, password_hash, display_name, alias,
 	avatar_url, security_level, role, status, last_login_at, created_at, updated_at`
 
+func normalizeUserDefaults(u *domain.User) {
+	if strings.TrimSpace(u.Role) == "" {
+		u.Role = domain.RoleUser
+	}
+	if u.Status == "" {
+		u.Status = domain.UserStatusActive
+	}
+}
+
 func scanUser(row interface{ Scan(dest ...any) error }) (*domain.User, error) {
 	var u domain.User
 	var id string
@@ -55,9 +64,7 @@ func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
 	if u.CreatedAt.IsZero() {
 		u.CreatedAt = now
 	}
-	if strings.TrimSpace(u.Role) == "" {
-		u.Role = domain.RoleUser
-	}
+	normalizeUserDefaults(u)
 	u.UpdatedAt = now
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -141,6 +148,7 @@ func (r *UserRepo) GetByAlias(ctx context.Context, alias string) (*domain.User, 
 }
 
 func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
+	normalizeUserDefaults(u)
 	u.UpdatedAt = time.Now().UTC()
 	query := `
 		UPDATE users SET

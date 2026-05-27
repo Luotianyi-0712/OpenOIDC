@@ -31,9 +31,7 @@ func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
 	if u.CreatedAt.IsZero() {
 		u.CreatedAt = now
 	}
-	if strings.TrimSpace(u.Role) == "" {
-		u.Role = domain.RoleUser
-	}
+	normalizeUserDefaults(u)
 	u.UpdatedAt = now
 
 	query := `
@@ -54,6 +52,15 @@ func (r *UserRepo) Create(ctx context.Context, u *domain.User) error {
 		return fmt.Errorf("insert user: %w", err)
 	}
 	return nil
+}
+
+func normalizeUserDefaults(u *domain.User) {
+	if strings.TrimSpace(u.Role) == "" {
+		u.Role = domain.RoleUser
+	}
+	if u.Status == "" {
+		u.Status = domain.UserStatusActive
+	}
 }
 
 func scanUser(row pgx.Row) (*domain.User, error) {
@@ -135,6 +142,7 @@ func (r *UserRepo) GetByAlias(ctx context.Context, alias string) (*domain.User, 
 }
 
 func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
+	normalizeUserDefaults(u)
 	u.UpdatedAt = time.Now().UTC()
 	var alias sql.NullString
 	if u.Alias != nil {
