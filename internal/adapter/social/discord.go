@@ -18,9 +18,18 @@ type discordUser struct {
 	Avatar        string `json:"avatar"`
 	Email         string `json:"email"`
 	Verified      bool   `json:"verified"`
+	MFAEnabled    bool   `json:"mfa_enabled"`
+	PremiumType   int    `json:"premium_type"`
+	PublicFlags   int    `json:"public_flags"`
+	Flags         int    `json:"flags"`
+	Locale        string `json:"locale"`
 }
 
-func NewDiscordProvider(clientID, clientSecret string) *OAuth2Provider {
+func NewDiscordProvider(clientID, clientSecret string, scopes []string) *OAuth2Provider {
+	// Default scopes if not configured
+	if len(scopes) == 0 {
+		scopes = []string{"identify", "email"}
+	}
 	return &OAuth2Provider{
 		name: domain.ProviderDiscord,
 		config: &oauth2.Config{
@@ -30,7 +39,7 @@ func NewDiscordProvider(clientID, clientSecret string) *OAuth2Provider {
 				AuthURL:  "https://discord.com/api/oauth2/authorize",
 				TokenURL: "https://discord.com/api/oauth2/token",
 			},
-			Scopes: []string{"identify", "email"},
+			Scopes: scopes,
 		},
 		userURL: "https://discord.com/api/users/@me",
 		parseUser: func(body []byte) (*port.ProviderUserInfo, error) {

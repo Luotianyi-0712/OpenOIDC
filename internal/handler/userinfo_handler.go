@@ -23,6 +23,8 @@ type UserInfoHandler struct {
 	sessionSvc  *service.SessionService
 	consentRepo port.ConsentRepository
 	auditRepo   port.AuditRepository
+	riskSvc     *service.RiskService
+	clientSvc   *service.ClientService
 }
 
 func NewUserInfoHandler(
@@ -34,6 +36,8 @@ func NewUserInfoHandler(
 	sessionSvc *service.SessionService,
 	consentRepo port.ConsentRepository,
 	auditRepo port.AuditRepository,
+	riskSvc *service.RiskService,
+	clientSvc *service.ClientService,
 ) *UserInfoHandler {
 	return &UserInfoHandler{
 		userRepo:    userRepo,
@@ -44,6 +48,8 @@ func NewUserInfoHandler(
 		sessionSvc:  sessionSvc,
 		consentRepo: consentRepo,
 		auditRepo:   auditRepo,
+		riskSvc:     riskSvc,
+		clientSvc:   clientSvc,
 	}
 }
 
@@ -371,4 +377,86 @@ func userPayload(u *domain.User) map[string]any {
 		"created_at":     u.CreatedAt,
 		"updated_at":     u.UpdatedAt,
 	}
+}
+
+type reportAppRequest struct {
+	Reason   string `json:"reason"`
+	Category string `json:"category"`
+}
+
+// ReportApp allows a user to report an abusive or malicious app they have authorized.
+func (h *UserInfoHandler) ReportApp(w http.ResponseWriter, r *http.Request) {
+	userID, err := mw.GetUserID(r.Context())
+	if err != nil {
+		Error(w, http.StatusUnauthorized, "unauthenticated", err.Error())
+		return
+	}
+
+	clientID := chi.URLParam(r, "clientId")
+	if clientID == "" {
+		Error(w, http.StatusBadRequest, "invalid_request", "client_id is required")
+		return
+	}
+
+	var req reportAppRequest
+	if err := DecodeJSON(r, &req); err != nil {
+		Error(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	if strings.TrimSpace(req.Reason) == "" {
+		Error(w, http.StatusBadRequest, "invalid_request", "reason is required")
+		return
+	}
+
+	// Verify the user has authorized this app
+	if h.consentRepo == nil {
+		Error(w, http.StatusNotImplemented, "not_implemented", "consent repository not available")
+		return
+	}
+	apps, err := h.consentRepo.ListAuthorizedApps(r.Context(), userID)
+	if err != nil {
+		Error(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	found := false
+	for _, app := range apps {
+		if app.ClientID == clientID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		Error(w, http.StatusForbidden, "not_authorized", "you have not authorized this app")
+		return
+	}
+
+	// Get the client to find its ID
+	if h.clientSvc == nil {
+		Error(w, http.StatusNotImplemented, "not_implemented", "client service not available")
+		return
+	}
+	client, err := h.clientSvc.GetClientByClientID(r.Context(), clientID)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			Error(w, http.StatusNotFound, "not_found", "app not found")
+			return
+		}
+		Error(w, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+
+	// Create the report
+	if h.riskSvc == nil {
+		Error(w, http.StatusNotImplemented, "not_implemented", "risk service not available")
+		return
+	}
+
+	report, err := h.riskSvc.ReportApp(r.Context(), userID, client.ID, req.Reason, req.Category)
+	if err != nil {
+		mapAdminError(w, err)
+		return
+	}
+
+	JSON(w, http.StatusCreated, report)
 }

@@ -22,12 +22,14 @@ func NewConsentRepo(db *sql.DB) *ConsentRepo {
 // Uses the subject column in oauth2_sessions to filter by user.
 func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) ([]*domain.UserAuthorization, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT os.client_id, oc.client_name, MIN(os.created_at) as granted_at
+		`SELECT os.client_id, oc.client_name, oc.description, oc.logo_url, oc.homepage_url,
+		        u.id, u.uid, u.display_name, u.avatar_url, MIN(os.created_at) as granted_at
 			 FROM oauth2_sessions os
 			 JOIN oidc_clients oc ON oc.client_id = os.client_id
+			 LEFT JOIN users u ON u.id = oc.owner_user_id
 			 WHERE os.active = 1 AND os.session_type IN ('access_token', 'refresh_token')
 			   AND os.subject = ?
-			 GROUP BY os.client_id, oc.client_name
+			 GROUP BY os.client_id
 			 ORDER BY granted_at DESC`,
 		userID.String())
 	if err != nil {
@@ -38,18 +40,39 @@ func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) 
 	var results []*domain.UserAuthorization
 	for rows.Next() {
 		var clientID, clientName string
+		var description, logoURL, homepageURL sql.NullString
+		var devID sql.NullString
+		var devUID sql.NullInt64
+		var devDisplayName, devAvatarURL sql.NullString
 		var createdAt sql.NullString
 
-		if err := rows.Scan(&clientID, &clientName, &createdAt); err != nil {
+		if err := rows.Scan(&clientID, &clientName, &description, &logoURL, &homepageURL,
+			&devID, &devUID, &devDisplayName, &devAvatarURL, &createdAt); err != nil {
 			continue
 		}
 
 		auth := &domain.UserAuthorization{
-			ID:         uuid.New(),
-			UserID:     userID,
-			ClientID:   clientID,
-			ClientName: clientName,
+			ID:          uuid.New(),
+			UserID:      userID,
+			ClientID:    clientID,
+			ClientName:  clientName,
+			Description: description.String,
+			LogoURL:     logoURL.String,
+			HomepageURL: homepageURL.String,
 		}
+
+		// Parse developer info
+		if devID.Valid && devID.String != "" {
+			if parsedID, err := uuid.Parse(devID.String); err == nil {
+				auth.Developer.ID = parsedID
+			}
+		}
+		if devUID.Valid {
+			auth.Developer.UID = devUID.Int64
+		}
+		auth.Developer.DisplayName = devDisplayName.String
+		auth.Developer.AvatarURL = devAvatarURL.String
+
 		if createdAt.Valid && createdAt.String != "" {
 			grantedAt := parseTimeLoose(createdAt.String)
 			auth.GrantedAt = grantedAt

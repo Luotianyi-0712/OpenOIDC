@@ -22,7 +22,7 @@ func NewUserRepo(db *sql.DB) *UserRepo {
 }
 
 const userSelectColumns = `id, uid, email, email_verified, password_hash, display_name, alias,
-	avatar_url, security_level, role, status, last_login_at, created_at, updated_at`
+	avatar_url, security_level, role, status, risk_report_email_enabled, last_login_at, created_at, updated_at`
 
 func normalizeUserDefaults(u *domain.User) {
 	if strings.TrimSpace(u.Role) == "" {
@@ -42,7 +42,7 @@ func scanUser(row interface{ Scan(dest ...any) error }) (*domain.User, error) {
 
 	err := row.Scan(
 		&id, &u.UID, &u.Email, &u.EmailVerified, &u.PasswordHash, &u.DisplayName, &alias,
-		&u.AvatarURL, &u.SecurityLevel, &u.Role, &status, &lastLogin,
+		&u.AvatarURL, &u.SecurityLevel, &u.Role, &status, &u.RiskReportEmailEnabled, &lastLogin,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -154,12 +154,12 @@ func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
 		UPDATE users SET
 			email = ?, email_verified = ?, display_name = ?, alias = ?,
 			avatar_url = ?, security_level = ?, role = ?, status = ?,
-			updated_at = ?
+			risk_report_email_enabled = ?, updated_at = ?
 		WHERE id = ?
 	`
 	res, err := r.db.ExecContext(ctx, query,
 		u.Email, u.EmailVerified, u.DisplayName, toNullString(u.Alias),
-		u.AvatarURL, u.SecurityLevel, u.Role, string(u.Status), u.UpdatedAt,
+		u.AvatarURL, u.SecurityLevel, u.Role, string(u.Status), u.RiskReportEmailEnabled, u.UpdatedAt,
 		u.ID.String(),
 	)
 	if err != nil {

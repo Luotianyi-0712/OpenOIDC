@@ -1390,6 +1390,7 @@ func (h *AdminHandler) PublicSettings(w http.ResponseWriter, r *http.Request) {
 		"captcha_site_key",
 		"turnstile_site_key",
 		"developer_min_trust_level",
+		"risk_report_email_notification_enabled",
 	}
 	result := make(map[string]string, len(keys)+1)
 	result["version"] = version.Version
@@ -2019,16 +2020,35 @@ func (h *AdminHandler) riskReportPayload(ctx context.Context, report *domain.Ris
 		"resolved_by": report.ResolvedBy,
 		"created_at":  report.CreatedAt,
 	}
-	if target, err := h.userRepo.GetByID(ctx, report.TargetID); err == nil {
-		payload["target_uid"] = target.UID
-		payload["target_email"] = target.Email
-		payload["target_display_name"] = target.DisplayName
+
+	// Check if this is a user reporting an app (ClientID == uuid.Nil)
+	if report.ClientID == uuid.Nil {
+		// User reporting app: TargetID is app ID, ReporterID is user ID
+		if client, err := h.clientSvc.GetClient(ctx, report.TargetID); err == nil {
+			payload["app_name"] = client.ClientName
+		}
+		if reporter, err := h.userRepo.GetByID(ctx, report.ReporterID); err == nil {
+			payload["reporter_uid"] = reporter.UID
+			payload["reporter_email"] = reporter.Email
+			payload["reporter_display_name"] = reporter.DisplayName
+		}
+	} else {
+		// Developer reporting user: TargetID is user ID, ClientID is app ID
+		if target, err := h.userRepo.GetByID(ctx, report.TargetID); err == nil {
+			payload["target_uid"] = target.UID
+			payload["target_email"] = target.Email
+			payload["target_display_name"] = target.DisplayName
+		}
+		if client, err := h.clientSvc.GetClient(ctx, report.ClientID); err == nil {
+			payload["client_name"] = client.ClientName
+		}
+		if reporter, err := h.userRepo.GetByID(ctx, report.ReporterID); err == nil {
+			payload["reporter_uid"] = reporter.UID
+			payload["reporter_email"] = reporter.Email
+			payload["reporter_display_name"] = reporter.DisplayName
+		}
 	}
-	if reporter, err := h.userRepo.GetByID(ctx, report.ReporterID); err == nil {
-		payload["reporter_uid"] = reporter.UID
-		payload["reporter_email"] = reporter.Email
-		payload["reporter_display_name"] = reporter.DisplayName
-	}
+
 	return payload
 }
 

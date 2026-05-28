@@ -22,20 +22,21 @@ const (
 )
 
 type User struct {
-	ID            uuid.UUID  `json:"id"`
-	UID           int64      `json:"uid"`
-	Email         string     `json:"email"`
-	EmailVerified bool       `json:"email_verified"`
-	PasswordHash  string     `json:"-"`
-	DisplayName   string     `json:"display_name"`
-	Alias         *string    `json:"alias,omitempty"`
-	AvatarURL     string     `json:"avatar_url"`
-	SecurityLevel int        `json:"security_level"`
-	Role          string     `json:"role"`
-	Status        UserStatus `json:"status"`
-	LastLoginAt   *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID                      uuid.UUID  `json:"id"`
+	UID                     int64      `json:"uid"`
+	Email                   string     `json:"email"`
+	EmailVerified           bool       `json:"email_verified"`
+	PasswordHash            string     `json:"-"`
+	DisplayName             string     `json:"display_name"`
+	Alias                   *string    `json:"alias,omitempty"`
+	AvatarURL               string     `json:"avatar_url"`
+	SecurityLevel           int        `json:"security_level"`
+	Role                    string     `json:"role"`
+	Status                  UserStatus `json:"status"`
+	RiskReportEmailEnabled  bool       `json:"risk_report_email_enabled"`
+	LastLoginAt             *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
 }
 
 // IsSuperAdmin returns true if the user has the super_admin role.

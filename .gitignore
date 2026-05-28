@@ -80,3 +80,6 @@ cmd/oauth-test-client/
 
 # Embedded / built frontend artifacts (built from frontend/ on demand)
 internal/handler/static/
+docs/1panel-deployment.md
+docker-compose.1panel.yml
+1panel.env.example

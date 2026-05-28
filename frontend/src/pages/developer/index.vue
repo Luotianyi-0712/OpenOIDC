@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { api } from '@/api/client'
-import { Plus, Loader2, AppWindow } from 'lucide-vue-next'
+import { Plus, Loader2, AppWindow, AlertCircle } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const router = useRouter()
+const auth = useAuthStore()
 
 interface App {
   id: string
@@ -47,12 +49,27 @@ function formatDate(d: string) {
     <!-- Header -->
     <div class="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
       <h2 class="text-lg font-semibold">{{ $t('developer.title') }}</h2>
-      <router-link
-        to="/developer/create"
-        class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
-      >
-        <Plus class="w-4 h-4" /> {{ $t('developer.createApp') }}
-      </router-link>
+      <div class="flex flex-col gap-2 w-full sm:w-auto">
+        <button
+          v-if="!auth.canCreateDeveloperApp"
+          disabled
+          class="bg-muted text-muted-foreground px-4 py-2 rounded-full text-sm font-medium cursor-not-allowed flex items-center justify-center gap-2 w-full sm:w-auto"
+          :title="$t('developer.cannotCreateHint')"
+        >
+          <Plus class="w-4 h-4" /> {{ $t('developer.createApp') }}
+        </button>
+        <router-link
+          v-else
+          to="/developer/create"
+          class="bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center justify-center gap-2 w-full sm:w-auto"
+        >
+          <Plus class="w-4 h-4" /> {{ $t('developer.createApp') }}
+        </router-link>
+        <p v-if="!auth.canCreateDeveloperApp && auth.developerStatus" class="text-xs text-muted-foreground flex items-start gap-1">
+          <AlertCircle class="w-3 h-3 mt-0.5 shrink-0" />
+          <span>{{ $t('developer.trustLevelRequired', { level: auth.developerStatus.min_trust_level }) }}</span>
+        </p>
+      </div>
     </div>
 
     <!-- Error -->
@@ -69,7 +86,16 @@ function formatDate(d: string) {
     <div v-else-if="apps.length === 0" class="flex flex-col items-center justify-center py-16 text-muted-foreground">
       <AppWindow class="w-10 h-10 mb-3 opacity-40" />
       <p class="text-sm">{{ $t('developer.noApps') }}</p>
+      <button
+        v-if="!auth.canCreateDeveloperApp"
+        disabled
+        class="mt-4 bg-muted text-muted-foreground px-4 py-2 rounded-full text-sm font-medium cursor-not-allowed flex items-center gap-2"
+        :title="$t('developer.cannotCreateHint')"
+      >
+        <Plus class="w-4 h-4" /> {{ $t('developer.createApp') }}
+      </button>
       <router-link
+        v-else
         to="/developer/create"
         class="mt-4 bg-foreground text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center gap-2"
       >

@@ -68,6 +68,10 @@ const router = createRouter({
       ],
     },
     {
+      path: '/error',
+      component: () => import('@/pages/error.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       component: () => import('@/pages/not-found.vue'),
     },

@@ -2,7 +2,7 @@
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { Fingerprint, User, MonitorSmartphone, Link2, Shield, LogOut, Code2, ShieldCheck, ScrollText, LayoutDashboard } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, currentLocale } from '@/i18n'
 
@@ -10,6 +10,12 @@ const { t } = useI18n()
 const auth = useAuthStore()
 const route = useRoute()
 const locale = ref(currentLocale())
+
+onMounted(() => {
+  if (auth.isLoggedIn && !auth.developerStatus) {
+    auth.fetchDeveloperStatus()
+  }
+})
 
 function toggleLocale() {
   const next = locale.value === 'zh' ? 'en' : 'zh'

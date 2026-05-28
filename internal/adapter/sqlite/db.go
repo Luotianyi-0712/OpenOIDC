@@ -296,6 +296,7 @@ func RunMigrations(db *sql.DB) error {
 		`ALTER TABLE provider_configs ADD COLUMN scopes TEXT NOT NULL DEFAULT '[]'`,
 		`ALTER TABLE provider_configs ADD COLUMN redirect_path TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE provider_configs ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE users ADD COLUMN risk_report_email_enabled BOOLEAN NOT NULL DEFAULT 1`,
 	}
 	for _, stmt := range alterStmts {
 		db.Exec(stmt) // ignore "duplicate column" errors
@@ -317,6 +318,9 @@ func RunMigrations(db *sql.DB) error {
 	if _, err := db.Exec(`UPDATE users SET role = 'user' WHERE role IS NULL OR TRIM(role) = ''`); err != nil {
 		return fmt.Errorf("repair user roles: %w", err)
 	}
+
+	// Insert default settings if not exists
+	_, _ = db.Exec(`INSERT OR IGNORE INTO global_settings (key, value, description, updated_at) VALUES ('risk_report_email_notification_enabled', 'true', '控制是否允许用户接收举报处理结果的邮件通知。关闭后，用户个人资料页将不显示邮件通知开关。', datetime('now'))`)
 
 	indexStmts := []string{
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_uid ON users(uid)`,

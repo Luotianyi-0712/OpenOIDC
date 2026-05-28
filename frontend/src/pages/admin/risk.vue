@@ -23,6 +23,8 @@ interface RiskReport {
   category: string
   status: string
   created_at: string
+  client_name?: string
+  app_name?: string
 }
 
 interface RiskListEntry {
@@ -64,8 +66,10 @@ const policyLoaded = ref(false)
 const actionDialog = ref(false)
 const actionType = ref<'confirm' | 'dismiss'>('confirm')
 const actionReportId = ref('')
+const actionReport = ref<RiskReport | null>(null)
 const actionNote = ref('')
 const actionLoading = ref(false)
+const disableApp = ref(false)
 
 const addDialog = ref(false)
 const addLoading = ref(false)
@@ -151,7 +155,9 @@ async function savePolicySettings() {
 function openAction(type: 'confirm' | 'dismiss', id: string) {
   actionType.value = type
   actionReportId.value = id
+  actionReport.value = reports.value.find(r => r.id === id) || null
   actionNote.value = ''
+  disableApp.value = false
   actionDialog.value = true
 }
 
@@ -162,6 +168,17 @@ async function submitAction() {
       ? `/admin/risk/reports/${actionReportId.value}/confirm`
       : `/admin/risk/reports/${actionReportId.value}/dismiss`
     await api.put(endpoint, { note: actionNote.value })
+
+    // If confirming an app report and user wants to disable the app
+    if (actionType.value === 'confirm' && disableApp.value && actionReport.value && isAppReport(actionReport.value)) {
+      try {
+        await api.put(`/admin/clients/${actionReport.value.target_id}`, { is_active: false })
+        toast.success(t('adminRisk.appDisabled'))
+      } catch (e: any) {
+        toast.error(e.message || t('adminRisk.disableAppFailed'))
+      }
+    }
+
     actionDialog.value = false
     await loadReports()
     await loadBlacklist()
@@ -212,6 +229,31 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
   if (uid) return `UID ${uid}`
   if (email) return email
   return fallback || '-'
+}
+
+function isAppReport(report: RiskReport): boolean {
+  // If client_id is all zeros (uuid.Nil), it's a user reporting an app
+  return report.client_id === '00000000-0000-0000-0000-000000000000'
+}
+
+function getReportTypeLabel(report: RiskReport): { targetLabel: string; reporterLabel: string; targetValue: string; reporterValue: string } {
+  if (isAppReport(report)) {
+    // User reporting app
+    return {
+      targetLabel: t('adminRisk.reportedApp'),
+      reporterLabel: t('adminRisk.reportingUser'),
+      targetValue: report.app_name || report.target_id,
+      reporterValue: userLabel(report.reporter_uid, report.reporter_email, report.reporter_id)
+    }
+  } else {
+    // Developer reporting user
+    return {
+      targetLabel: t('adminRisk.reportedUser'),
+      reporterLabel: t('adminRisk.reportingApp'),
+      targetValue: userLabel(report.target_uid, report.target_email, report.target_id),
+      reporterValue: report.client_name || report.client_id
+    }
+  }
 }
 </script>
 
@@ -278,8 +320,8 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
               </div>
               <p class="mt-2 text-sm">{{ report.reason }}</p>
               <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span>{{ $t('adminRisk.target') }}: <code class="font-mono">{{ userLabel(report.target_uid, report.target_email, report.target_id) }}</code></span>
-                <span>{{ $t('adminRisk.reporter') }}: <code class="font-mono">{{ userLabel(report.reporter_uid, report.reporter_email, report.reporter_id) }}</code></span>
+                <span>{{ getReportTypeLabel(report).targetLabel }}: <code class="font-mono">{{ getReportTypeLabel(report).targetValue }}</code></span>
+                <span>{{ getReportTypeLabel(report).reporterLabel }}: <code class="font-mono">{{ getReportTypeLabel(report).reporterValue }}</code></span>
               </div>
             </div>
             <div class="flex flex-wrap gap-2 sm:justify-end sm:shrink-0">
@@ -450,13 +492,32 @@ function userLabel(uid?: number, email?: string, fallback?: string | null): stri
         <p class="text-sm text-muted-foreground mb-4">
           {{ actionType === 'confirm' ? $t('adminRisk.confirmHint') : $t('adminRisk.dismissHint') }}
         </p>
+
+        <!-- Disable App Option (only for app reports when confirming) -->
+        <div v-if="actionType === 'confirm' && actionReport && isAppReport(actionReport)" class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <label class="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              v-model="disableApp"
+              class="mt-0.5 w-4 h-4 rounded border-gray-300 text-foreground focus:ring-2 focus:ring-foreground/20"
+            />
+            <div class="flex-1">
+              <div class="text-sm font-medium text-amber-900">{{ $t('adminRisk.disableAppOption') }}</div>
+              <div class="text-xs text-amber-700 mt-0.5">{{ $t('adminRisk.disableAppHint') }}</div>
+            </div>
+          </label>
+        </div>
+
         <div class="mb-4">
-          <label class="block text-sm font-medium mb-1">{{ $t('adminRisk.noteLabel') }}</label>
-          <input
+          <label class="block text-sm font-medium mb-1">
+            {{ actionType === 'dismiss' ? $t('adminRisk.dismissReasonLabel') : $t('adminRisk.noteLabel') }}
+            <span v-if="actionType === 'dismiss'" class="text-xs text-muted-foreground font-normal ml-1">{{ $t('adminRisk.dismissReasonOptional') }}</span>
+          </label>
+          <textarea
             v-model="actionNote"
-            type="text"
-            :placeholder="$t('adminRisk.notePlaceholder')"
-            class="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10"
+            rows="3"
+            :placeholder="actionType === 'dismiss' ? $t('adminRisk.dismissReasonPlaceholder') : $t('adminRisk.notePlaceholder')"
+            class="w-full px-3 py-2 border border-border rounded-lg text-sm outline-none focus:ring-2 focus:ring-foreground/10 resize-y"
           />
         </div>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

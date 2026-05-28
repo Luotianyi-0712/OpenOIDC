@@ -64,8 +64,13 @@ const actionOptions = [
   'security_level.upgraded',
   'security_level.downgraded',
   'risk.user_reported',
+  'risk.app_reported',
+  'risk.report_confirmed',
+  'risk.report_dismissed',
   'risk.enforcement',
   'risk.list_added',
+  'risk.list_removed',
+  'risk.restored',
   'token_issue',
   'token_revoke',
 ]

@@ -65,7 +65,7 @@ func (s *FositeStore) GetClient(ctx context.Context, id string) (fosite.Client, 
 	err := s.db.QueryRow(ctx,
 		`SELECT client_id, client_secret_encrypted, redirect_uris, grant_types, response_types,
 		 scopes, audience, token_endpoint_auth_method, is_public
-		 FROM oidc_clients WHERE client_id = $1 AND is_active = TRUE`,
+		 FROM oidc_clients WHERE client_id = $1`,
 		id,
 	).Scan(&clientID, &secret, &redirectURIs, &grantTypes, &responseTypes, &scopes, &audience, &authMethod, &isPublic)
 	if err != nil {

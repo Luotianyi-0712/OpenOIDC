@@ -99,6 +99,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
     fields: [
       { key: 'client_id', label: 'Client ID', type: 'text', placeholder: 'Iv1.xxxxxxxxxx' },
       { key: 'client_secret', label: 'Client Secret', type: 'password' },
+      { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'read:user user:email repo read:org' },
     ],
     callbackPath: '/api/v1/social/github/callback',
   },
@@ -109,6 +110,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
     fields: [
       { key: 'client_id', label: 'Client ID', type: 'text', placeholder: 'xxxx.apps.googleusercontent.com' },
       { key: 'client_secret', label: 'Client Secret', type: 'password' },
+      { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'openid profile email' },
     ],
     callbackPath: '/api/v1/social/google/callback',
   },
@@ -120,6 +122,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
       { key: 'base_url', label: 'Instance URL', type: 'text', placeholder: 'https://gitlab.com' },
       { key: 'client_id', label: 'Application ID', type: 'text' },
       { key: 'client_secret', label: 'Secret', type: 'password' },
+      { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'read_user' },
     ],
     callbackPath: '/api/v1/social/gitlab/callback',
   },
@@ -130,6 +133,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
     fields: [
       { key: 'client_id', label: 'Client ID', type: 'text' },
       { key: 'client_secret', label: 'Client Secret', type: 'password' },
+      { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'user_info' },
     ],
     callbackPath: '/api/v1/social/gitee/callback',
   },
@@ -140,6 +144,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
     fields: [
       { key: 'client_id', label: 'Client ID', type: 'text' },
       { key: 'client_secret', label: 'Client Secret', type: 'password' },
+      { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'user' },
     ],
     callbackPath: '/api/v1/social/linuxdo/callback',
     docUrl: 'https://connect.linux.do',
@@ -151,6 +156,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
     fields: [
       { key: 'client_id', label: 'Client ID', type: 'text' },
       { key: 'client_secret', label: 'Client Secret', type: 'password' },
+      { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'identify email guilds connections' },
     ],
     callbackPath: '/api/v1/social/discord/callback',
   },
@@ -171,6 +177,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
       { key: 'tenant_id', label: 'Tenant ID', type: 'text', placeholder: 'common' },
       { key: 'client_id', label: 'Application (client) ID', type: 'text' },
       { key: 'client_secret', label: 'Client Secret', type: 'password' },
+      { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'openid profile email User.Read offline_access' },
     ],
     callbackPath: '/api/v1/social/microsoft/callback',
   },
@@ -183,6 +190,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
       { key: 'team_id', label: 'Team ID', type: 'text' },
       { key: 'key_id', label: 'Key ID', type: 'text' },
       { key: 'private_key', label: 'Private Key (.p8)', type: 'textarea', placeholder: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----' },
+      { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'name email' },
     ],
     callbackPath: '/api/v1/social/apple/callback',
   },
@@ -193,6 +201,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
     fields: [
       { key: 'app_id', label: 'APP ID', type: 'text' },
       { key: 'app_secret', label: 'APP Key', type: 'password' },
+      { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'get_user_info' },
     ],
     callbackPath: '/api/v1/social/qq/callback',
   },
@@ -322,11 +331,19 @@ function providerPayload(form: ProviderForm, fields: FieldDef[], includeCustomOA
   }
 
   addString(payload, 'display_name', form.display_name)
-  for (const field of fields) addString(payload, field.key, form[field.key])
+  for (const field of fields) {
+    if (field.key === 'scopes') {
+      payload.scopes = splitScopes(stringValue(form.scopes))
+    } else {
+      addString(payload, field.key, form[field.key])
+    }
+  }
 
   if (includeCustomOAuth2) {
     payload.type = CUSTOM_PROVIDER_TYPE
-    payload.scopes = splitScopes(stringValue(form.scopes))
+    if (!payload.scopes) {
+      payload.scopes = splitScopes(stringValue(form.scopes))
+    }
     for (const field of oauth2Fields) {
       if (field.key !== 'scopes') addString(payload, field.key, form[field.key])
     }

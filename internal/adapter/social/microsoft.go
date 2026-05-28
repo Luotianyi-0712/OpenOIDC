@@ -21,9 +21,13 @@ type microsoftUser struct {
 	UserPrincipalName string `json:"userPrincipalName"`
 }
 
-func NewMicrosoftProvider(clientID, clientSecret, tenantID string) *OAuth2Provider {
+func NewMicrosoftProvider(clientID, clientSecret, tenantID string, scopes []string) *OAuth2Provider {
 	if tenantID == "" {
 		tenantID = "common"
+	}
+	// Default scopes if not configured
+	if len(scopes) == 0 {
+		scopes = []string{"openid", "profile", "email", "User.Read", "offline_access"}
 	}
 	configuredTenant := tenantID
 	return &OAuth2Provider{
@@ -35,7 +39,7 @@ func NewMicrosoftProvider(clientID, clientSecret, tenantID string) *OAuth2Provid
 				AuthURL:  "https://login.microsoftonline.com/" + tenantID + "/oauth2/v2.0/authorize",
 				TokenURL: "https://login.microsoftonline.com/" + tenantID + "/oauth2/v2.0/token",
 			},
-			Scopes: []string{"openid", "profile", "email", "User.Read", "offline_access"},
+			Scopes: scopes,
 		},
 		userURL: "https://graph.microsoft.com/v1.0/me",
 		fetchUser: func(ctx context.Context, client *http.Client, token *oauth2.Token) (*port.ProviderUserInfo, error) {

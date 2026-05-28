@@ -146,6 +146,12 @@ func (s *SecurityLevelService) ComputeSecurityLevel(ctx context.Context, userID 
 }
 
 func (s *SecurityLevelService) evaluateRule(conds domain.RuleConditions, ctx ruleEvalContext) bool {
+	// Support new nested structure (Items) if present
+	if len(conds.Items) > 0 {
+		return s.evaluateConditionItems(conds.Items, conds.Operator, ctx)
+	}
+
+	// Fallback to old flat structure (Conditions) for backward compatibility
 	if len(conds.Conditions) == 0 {
 		return false
 	}
@@ -167,6 +173,49 @@ func (s *SecurityLevelService) evaluateRule(conds domain.RuleConditions, ctx rul
 			matchedAny = true
 		}
 	}
+	if op == domain.OperatorOR {
+		return false
+	}
+	return matchedAny
+}
+
+func (s *SecurityLevelService) evaluateConditionItems(items []domain.ConditionItem, operator domain.RuleOperator, ctx ruleEvalContext) bool {
+	if len(items) == 0 {
+		return false
+	}
+
+	op := operator
+	if op == "" {
+		op = domain.OperatorAND
+	}
+
+	matchedAny := false
+	for _, item := range items {
+		var ok bool
+
+		// Evaluate nested group
+		if item.Group != nil {
+			ok = s.evaluateConditionItems(item.Group.Items, item.Group.Operator, ctx)
+		} else if item.Condition != nil {
+			// Evaluate single condition
+			ok = evaluateCondition(*item.Condition, ctx)
+		} else {
+			// Empty item, skip
+			continue
+		}
+
+		if op == domain.OperatorOR {
+			if ok {
+				return true
+			}
+		} else {
+			if !ok {
+				return false
+			}
+			matchedAny = true
+		}
+	}
+
 	if op == domain.OperatorOR {
 		return false
 	}
@@ -364,9 +413,16 @@ func (s *SecurityLevelService) GetLevelInfo(ctx context.Context, userID uuid.UUI
 			break
 		}
 		if !s.evaluateRule(r.Conditions, evalCtx) {
-			missing := make([]MissingCondition, 0, len(r.Conditions.Conditions))
-			for _, c := range r.Conditions.Conditions {
-				missing = append(missing, conditionStatus(c, evalCtx))
+			var missing []MissingCondition
+			// Support new nested structure
+			if len(r.Conditions.Items) > 0 {
+				missing = flattenConditionItems(r.Conditions.Items, evalCtx)
+			} else {
+				// Fallback to old flat structure
+				missing = make([]MissingCondition, 0, len(r.Conditions.Conditions))
+				for _, c := range r.Conditions.Conditions {
+					missing = append(missing, conditionStatus(c, evalCtx))
+				}
 			}
 			next = &NextLevelRequirement{
 				Level:    r.Level,
@@ -437,7 +493,8 @@ func validateRule(r *domain.SecurityLevelRule) error {
 	if r.Level < 0 {
 		return fmt.Errorf("%w: level must be >= 0", ErrInvalidInput)
 	}
-	if len(r.Conditions.Conditions) == 0 {
+	// Support both new nested structure and old flat structure
+	if len(r.Conditions.Items) == 0 && len(r.Conditions.Conditions) == 0 {
 		return fmt.Errorf("%w: at least one condition required", ErrInvalidInput)
 	}
 	if r.Conditions.Operator == "" {
@@ -446,12 +503,47 @@ func validateRule(r *domain.SecurityLevelRule) error {
 	if r.Conditions.Operator != domain.OperatorAND && r.Conditions.Operator != domain.OperatorOR {
 		return fmt.Errorf("%w: operator must be AND or OR", ErrInvalidInput)
 	}
+
+	// Validate new nested structure if present
+	if len(r.Conditions.Items) > 0 {
+		if err := validateConditionItems(r.Conditions.Items); err != nil {
+			return err
+		}
+	}
+
+	// Validate old flat structure if present
 	for i, c := range r.Conditions.Conditions {
 		c = normalizeCondition(c)
 		if err := validateCondition(c); err != nil {
 			return err
 		}
 		r.Conditions.Conditions[i] = c
+	}
+	return nil
+}
+
+func validateConditionItems(items []domain.ConditionItem) error {
+	for _, item := range items {
+		if item.Group != nil {
+			// Validate nested group
+			if item.Group.Operator != domain.OperatorAND && item.Group.Operator != domain.OperatorOR {
+				return fmt.Errorf("%w: group operator must be AND or OR", ErrInvalidInput)
+			}
+			if len(item.Group.Items) == 0 {
+				return fmt.Errorf("%w: group must have at least one item", ErrInvalidInput)
+			}
+			// Recursively validate nested items
+			if err := validateConditionItems(item.Group.Items); err != nil {
+				return err
+			}
+		} else if item.Condition != nil {
+			// Validate single condition
+			c := normalizeCondition(*item.Condition)
+			if err := validateCondition(c); err != nil {
+				return err
+			}
+			*item.Condition = c
+		}
 	}
 	return nil
 }
@@ -612,6 +704,21 @@ func providerCondition(t domain.RuleConditionType) bool {
 	default:
 		return false
 	}
+}
+
+// flattenConditionItems recursively flattens nested condition items into a flat list
+func flattenConditionItems(items []domain.ConditionItem, ctx ruleEvalContext) []MissingCondition {
+	var result []MissingCondition
+	for _, item := range items {
+		if item.Group != nil {
+			// Recursively flatten nested group
+			result = append(result, flattenConditionItems(item.Group.Items, ctx)...)
+		} else if item.Condition != nil {
+			// Add single condition status
+			result = append(result, conditionStatus(*item.Condition, ctx))
+		}
+	}
+	return result
 }
 
 func conditionStatus(c domain.RuleCondition, ctx ruleEvalContext) MissingCondition {

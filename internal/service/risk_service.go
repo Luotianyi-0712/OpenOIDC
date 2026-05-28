@@ -20,6 +20,7 @@ type RiskService struct {
 	userRepo     port.UserRepository
 	auditRepo    port.AuditRepository
 	securitySvc  *SecurityLevelService
+	emailSvc     port.EmailSender
 }
 
 func NewRiskService(
@@ -29,6 +30,7 @@ func NewRiskService(
 	userRepo port.UserRepository,
 	auditRepo port.AuditRepository,
 	securitySvc *SecurityLevelService,
+	emailSvc port.EmailSender,
 ) *RiskService {
 	return &RiskService{
 		reportRepo:   reportRepo,
@@ -37,6 +39,7 @@ func NewRiskService(
 		userRepo:     userRepo,
 		auditRepo:    auditRepo,
 		securitySvc:  securitySvc,
+		emailSvc:     emailSvc,
 	}
 }
 
@@ -90,6 +93,57 @@ func (s *RiskService) ReportUser(ctx context.Context, clientID, reporterID, targ
 	return report, nil
 }
 
+// ReportApp allows a user to report an abusive or malicious app.
+func (s *RiskService) ReportApp(ctx context.Context, reporterID, targetClientID uuid.UUID, reason, category string) (*domain.RiskReport, error) {
+	if reason == "" {
+		return nil, fmt.Errorf("%w: reason required", ErrInvalidInput)
+	}
+	switch category {
+	case domain.ReportCategorySpam, domain.ReportCategoryAbuse, domain.ReportCategoryFraud, domain.ReportCategoryBot, domain.ReportCategoryOther:
+	default:
+		category = domain.ReportCategoryOther
+	}
+
+	// Check if user has already reported this app
+	existingReports, err := s.reportRepo.ListByTarget(ctx, targetClientID)
+	if err != nil {
+		return nil, fmt.Errorf("list target reports: %w", err)
+	}
+	for _, existing := range existingReports {
+		if existing.ReporterID == reporterID && existing.Status != domain.ReportStatusDismissed {
+			return nil, ErrAlreadyExists
+		}
+	}
+
+	report := &domain.RiskReport{
+		ID:         uuid.New(),
+		ClientID:   uuid.Nil, // No client context for user-reported apps
+		ReporterID: reporterID,
+		TargetID:   targetClientID,
+		Reason:     reason,
+		Category:   category,
+		Status:     domain.ReportStatusPending,
+		CreatedAt:  time.Now().UTC(),
+	}
+	if err := s.reportRepo.Create(ctx, report); err != nil {
+		return nil, fmt.Errorf("create report: %w", err)
+	}
+
+	rt := "risk_report"
+	rid := report.ID.String()
+	_ = s.auditRepo.CreateLog(ctx, &domain.AuditLog{
+		ID:           uuid.New(),
+		UserID:       &reporterID,
+		Action:       "risk.app_reported",
+		ResourceType: &rt,
+		ResourceID:   &rid,
+		Details:      map[string]any{"target": targetClientID.String(), "category": category},
+		CreatedAt:    report.CreatedAt,
+	})
+
+	return report, nil
+}
+
 // ConfirmReport is called by admin to confirm a report and enforce risk measures.
 func (s *RiskService) ConfirmReport(ctx context.Context, reportID, adminID uuid.UUID, note string) error {
 	report, err := s.reportRepo.GetByID(ctx, reportID)
@@ -120,7 +174,15 @@ func (s *RiskService) ConfirmReport(ctx context.Context, reportID, adminID uuid.
 		CreatedAt:    now,
 	})
 
-	return s.enforceRisk(ctx, report.TargetID, report.ID)
+	// Notify the reporter
+	s.notifyReporter(ctx, report, "confirmed", note)
+
+	// Only enforce risk measures if this is a user report (ClientID != uuid.Nil)
+	// For app reports (ClientID == uuid.Nil), admin should manually disable the app
+	if report.ClientID != uuid.Nil {
+		return s.enforceRisk(ctx, report.TargetID, report.ID)
+	}
+	return nil
 }
 
 // DismissReport marks a report as dismissed (false positive).
@@ -149,6 +211,10 @@ func (s *RiskService) DismissReport(ctx context.Context, reportID, adminID uuid.
 		Details:      map[string]any{"target": report.TargetID.String(), "note": note, "was_confirmed": wasConfirmed},
 		CreatedAt:    now,
 	})
+
+	// Notify the reporter
+	s.notifyReporter(ctx, report, "dismissed", note)
+
 	if wasConfirmed {
 		if err := s.riskListRepo.DeleteByReport(ctx, report.ID); err != nil {
 			return fmt.Errorf("delete report risk entries: %w", err)
@@ -347,4 +413,41 @@ func (s *RiskService) ListPendingReports(ctx context.Context, offset, limit int)
 // ListReportsByTarget returns all reports for a specific user.
 func (s *RiskService) ListReportsByTarget(ctx context.Context, targetID uuid.UUID) ([]*domain.RiskReport, error) {
 	return s.reportRepo.ListByTarget(ctx, targetID)
+}
+
+// notifyReporter sends notification to the reporter about the report outcome.
+// If SMTP is configured and user has email notifications enabled, send email.
+// Otherwise, log to user's audit log.
+func (s *RiskService) notifyReporter(ctx context.Context, report *domain.RiskReport, outcome, reason string) {
+	reporter, err := s.userRepo.GetByID(ctx, report.ReporterID)
+	if err != nil {
+		return
+	}
+
+	// Check if SMTP is configured and user wants email notifications
+	if s.emailSvc != nil && reporter.RiskReportEmailEnabled {
+		// Try to send email
+		if err := s.emailSvc.SendRiskReportResolved(ctx, reporter.Email, report.ID.String(), outcome, reason); err == nil {
+			return
+		}
+		// If email fails, fall through to audit log
+	}
+
+	// Log to user's audit log
+	action := "risk.report_confirmed_notification"
+	if outcome == "dismissed" {
+		action = "risk.report_dismissed_notification"
+	}
+
+	rt := "risk_report"
+	rid := report.ID.String()
+	_ = s.auditRepo.CreateLog(ctx, &domain.AuditLog{
+		ID:           uuid.New(),
+		UserID:       &report.ReporterID,
+		Action:       action,
+		ResourceType: &rt,
+		ResourceID:   &rid,
+		Details:      map[string]any{"outcome": outcome, "reason": reason, "target": report.TargetID.String()},
+		CreatedAt:    time.Now().UTC(),
+	})
 }

@@ -22,11 +22,15 @@ type gitlabUser struct {
 	ConfirmedAt string `json:"confirmed_at"`
 }
 
-func NewGitLabProvider(clientID, clientSecret, baseURL string) *OAuth2Provider {
+func NewGitLabProvider(clientID, clientSecret, baseURL string, scopes []string) *OAuth2Provider {
 	if baseURL == "" {
 		baseURL = "https://gitlab.com"
 	}
 	baseURL = strings.TrimRight(baseURL, "/")
+	// Default scopes if not configured
+	if len(scopes) == 0 {
+		scopes = []string{"read_user"}
+	}
 	return &OAuth2Provider{
 		name: domain.ProviderGitLab,
 		config: &oauth2.Config{
@@ -36,7 +40,7 @@ func NewGitLabProvider(clientID, clientSecret, baseURL string) *OAuth2Provider {
 				AuthURL:  baseURL + "/oauth/authorize",
 				TokenURL: baseURL + "/oauth/token",
 			},
-			Scopes: []string{"read_user"},
+			Scopes: scopes,
 		},
 		userURL: baseURL + "/api/v4/user",
 		parseUser: func(body []byte) (*port.ProviderUserInfo, error) {

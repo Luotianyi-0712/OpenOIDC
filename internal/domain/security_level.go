@@ -40,9 +40,21 @@ type RuleCondition struct {
 	MinBindingDays int               `json:"min_binding_days,omitempty"`
 }
 
+// ConditionItem can be either a RuleCondition or a nested ConditionGroup
+type ConditionItem struct {
+	Condition *RuleCondition   `json:"condition,omitempty"`
+	Group     *ConditionGroup  `json:"group,omitempty"`
+}
+
+type ConditionGroup struct {
+	Operator RuleOperator    `json:"operator"`
+	Items    []ConditionItem `json:"items"`
+}
+
 type RuleConditions struct {
 	Operator   RuleOperator    `json:"operator"`
-	Conditions []RuleCondition `json:"rules"`
+	Conditions []RuleCondition `json:"rules"` // Keep for backward compatibility
+	Items      []ConditionItem `json:"items,omitempty"` // New nested structure
 }
 
 type SecurityLevelRule struct {

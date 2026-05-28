@@ -67,7 +67,7 @@ func (s *FositeStore) GetClient(ctx context.Context, id string) (fosite.Client, 
 	err := s.db.QueryRowContext(ctx,
 		`SELECT client_id, client_secret_encrypted, redirect_uris, grant_types, response_types,
 		 scopes, is_confidential
-		 FROM oidc_clients WHERE client_id = ? AND is_active = 1`,
+		 FROM oidc_clients WHERE client_id = ?`,
 		id,
 	).Scan(&clientID, &secret, &redirectURIsJSON, &grantTypesJSON,
 		&responseTypesJSON, &scopesJSON, &isConfidential)

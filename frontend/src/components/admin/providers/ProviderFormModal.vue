@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Check, Copy, Loader2, Trash2, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import type { FieldDef, Provider, ProviderForm, ProviderFormKey, ProviderMeta } from '@/composables/useAdminProviders'
+import ScopesInput from './ScopesInput.vue'
 
 const props = defineProps<{
   mode: 'create' | 'edit'
@@ -190,10 +191,16 @@ async function copyText(text: string, field: string) {
           </div>
 
           <section class="grid gap-4 md:grid-cols-2">
-            <div v-for="field in fields" :key="field.key" :class="field.type === 'textarea' ? 'md:col-span-2' : ''">
+            <div v-for="field in fields" :key="field.key" :class="field.type === 'textarea' || field.key === 'scopes' ? 'md:col-span-2' : ''">
               <label class="block text-sm font-medium mb-1.5">{{ fieldLabel(field) }}</label>
+              <ScopesInput
+                v-if="field.key === 'scopes' && providerKey"
+                :provider="providerKey"
+                :model-value="stringField(field.key)"
+                @update:model-value="emit('update-field', field.key, $event)"
+              />
               <textarea
-                v-if="field.type === 'textarea'"
+                v-else-if="field.type === 'textarea'"
                 :value="stringField(field.key)"
                 rows="4"
                 class="w-full px-3 py-2 border border-border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-foreground/10 resize-none"
@@ -223,7 +230,14 @@ async function copyText(text: string, field: string) {
             <div class="grid gap-4 md:grid-cols-2">
               <div v-for="field in oauth2Fields" :key="field.key" :class="field.key.includes('endpoint') || field.key === 'scopes' ? 'md:col-span-2' : ''">
                 <label class="block text-sm font-medium mb-1.5">{{ fieldLabel(field) }}</label>
+                <ScopesInput
+                  v-if="field.key === 'scopes' && providerKey"
+                  :provider="providerKey"
+                  :model-value="stringField(field.key)"
+                  @update:model-value="emit('update-field', field.key, $event)"
+                />
                 <input
+                  v-else
                   :value="stringField(field.key)"
                   type="text"
                   class="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-foreground/10"

@@ -52,7 +52,16 @@ type UserAuthorization struct {
 	UserID      uuid.UUID `json:"user_id"`
 	ClientID    string    `json:"client_id"`
 	ClientName  string    `json:"client_name"`
-	Scopes      []string  `json:"scopes"`
-	GrantedAt   time.Time `json:"granted_at"`
-	LastUsedAt  time.Time `json:"last_used_at"`
+	Description string    `json:"description"`
+	LogoURL     string    `json:"logo_url"`
+	HomepageURL string    `json:"homepage_url"`
+	Developer   struct {
+		ID          uuid.UUID `json:"id"`
+		UID         int64     `json:"uid"`
+		DisplayName string    `json:"display_name"`
+		AvatarURL   string    `json:"avatar_url"`
+	} `json:"developer"`
+	Scopes     []string  `json:"scopes"`
+	GrantedAt  time.Time `json:"granted_at"`
+	LastUsedAt time.Time `json:"last_used_at"`
 }

@@ -117,6 +117,7 @@ func NewRouter(d Deps) *chi.Mux {
 			r.Delete("/me/sessions/{id}", d.UserInfoHandler.RevokeSession)
 			r.Get("/me/authorized-apps", d.UserInfoHandler.ListAuthorizedApps)
 			r.Delete("/me/authorized-apps/{clientId}", d.UserInfoHandler.RevokeAuthorizedApp)
+			r.Post("/me/authorized-apps/{clientId}/report", d.UserInfoHandler.ReportApp)
 
 			r.Post("/me/passkeys/register/begin", d.PasskeyHandler.BeginRegister)
 			r.Post("/me/passkeys/register/finish", d.PasskeyHandler.FinishRegister)

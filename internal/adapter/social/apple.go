@@ -28,14 +28,20 @@ type AppleProvider struct {
 	teamID     string
 	keyID      string
 	privateKey *ecdsa.PrivateKey
+	scopes     []string
 }
 
-func NewAppleProvider(clientID, teamID, keyID string, privateKey *ecdsa.PrivateKey) *AppleProvider {
+func NewAppleProvider(clientID, teamID, keyID string, privateKey *ecdsa.PrivateKey, scopes []string) *AppleProvider {
+	// Default scopes if not configured
+	if len(scopes) == 0 {
+		scopes = []string{"name", "email"}
+	}
 	return &AppleProvider{
 		clientID:   clientID,
 		teamID:     teamID,
 		keyID:      keyID,
 		privateKey: privateKey,
+		scopes:     scopes,
 	}
 }
 
@@ -46,7 +52,7 @@ func (p *AppleProvider) BeginAuth(_ context.Context, state, redirectURL string) 
 	params.Set("client_id", p.clientID)
 	params.Set("redirect_uri", redirectURL)
 	params.Set("response_type", "code")
-	params.Set("scope", "name email")
+	params.Set("scope", strings.Join(p.scopes, " "))
 	params.Set("response_mode", "form_post")
 	params.Set("state", state)
 	return appleAuthURL + "?" + params.Encode(), nil

@@ -13,6 +13,7 @@ export interface User {
   security_level: number
   role: 'super_admin' | 'admin' | 'user'
   status: string
+  risk_report_email_enabled: boolean
   last_login_at: string | null
   created_at: string
 }

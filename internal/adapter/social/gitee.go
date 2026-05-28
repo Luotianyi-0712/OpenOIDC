@@ -19,7 +19,11 @@ type giteeUser struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-func NewGiteeProvider(clientID, clientSecret string) *OAuth2Provider {
+func NewGiteeProvider(clientID, clientSecret string, scopes []string) *OAuth2Provider {
+	// Default scopes if not configured
+	if len(scopes) == 0 {
+		scopes = []string{"user_info"}
+	}
 	return &OAuth2Provider{
 		name: domain.ProviderGitee,
 		config: &oauth2.Config{
@@ -29,7 +33,7 @@ func NewGiteeProvider(clientID, clientSecret string) *OAuth2Provider {
 				AuthURL:  "https://gitee.com/oauth/authorize",
 				TokenURL: "https://gitee.com/oauth/token",
 			},
-			Scopes: []string{"user_info"},
+			Scopes: scopes,
 		},
 		userURL: "https://gitee.com/api/v5/user",
 		parseUser: func(body []byte) (*port.ProviderUserInfo, error) {

@@ -21,14 +21,18 @@ type googleUser struct {
 	HostedDomain  string `json:"hd"`
 }
 
-func NewGoogleProvider(clientID, clientSecret string) *OAuth2Provider {
+func NewGoogleProvider(clientID, clientSecret string, scopes []string) *OAuth2Provider {
+	// Default scopes if not configured
+	if len(scopes) == 0 {
+		scopes = []string{"openid", "profile", "email"}
+	}
 	return &OAuth2Provider{
 		name: domain.ProviderGoogle,
 		config: &oauth2.Config{
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
 			Endpoint:     google.Endpoint,
-			Scopes:       []string{"openid", "profile", "email"},
+			Scopes:       scopes,
 		},
 		userURL: "https://www.googleapis.com/oauth2/v2/userinfo",
 		authOptions: []oauth2.AuthCodeOption{

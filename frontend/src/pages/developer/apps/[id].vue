@@ -344,7 +344,7 @@ const integrationItems = computed(() => {
               {{ $t('save') }}
             </button>
             <span v-if="saveSuccess" class="text-sm text-green-600 flex items-center gap-1">
-              <Check class="w-4 h-4" /> {{ $t('developer.copied') }}
+              <Check class="w-4 h-4" /> {{ $t('developer.saved') }}
             </span>
           </div>
         </form>

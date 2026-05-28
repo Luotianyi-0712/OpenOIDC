@@ -26,6 +26,7 @@ export interface PublicSettings {
   turnstile_site_key: string
   developer_min_trust_level: number
   passkey_enabled: boolean
+  risk_report_email_notification_enabled: boolean
   version: string
 }
 
@@ -111,6 +112,7 @@ export function usePublicConfig() {
     turnstile_site_key: '',
     developer_min_trust_level: 1,
     passkey_enabled: true,
+    risk_report_email_notification_enabled: true,
     version: '1.0.0',
   })
   const loaded = ref(false)
@@ -140,6 +142,7 @@ export function usePublicConfig() {
           turnstile_site_key: d.turnstile_site_key || '',
           developer_min_trust_level: parseInt(d.developer_min_trust_level) || 1,
           passkey_enabled: d.passkey_enabled !== 'false',
+          risk_report_email_notification_enabled: d.risk_report_email_notification_enabled !== 'false',
           version: d.version || '1.0.0',
         }
       }

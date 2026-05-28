@@ -105,6 +105,14 @@ func (h *OIDCHandler) Authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if the client is disabled
+	if !client.IsActive {
+		// Redirect to a friendly error page instead of returning JSON error
+		errorURL := "/error?type=app_disabled&app=" + url.QueryEscape(client.ClientName)
+		http.Redirect(w, r, errorURL, http.StatusFound)
+		return
+	}
+
 	if user.SecurityLevel < client.MinSecurityLevel {
 		h.provider.WriteAuthorizeError(ctx, w, ar,
 			fosite.ErrAccessDenied.WithHint("security level insufficient for this client"))
@@ -224,6 +232,13 @@ func (h *OIDCHandler) Token(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if the client is disabled
+	client, err := h.clientSvc.GetClientByClientID(ctx, accessReq.GetClient().GetID())
+	if err == nil && !client.IsActive {
+		h.provider.WriteAccessError(ctx, w, accessReq, fosite.ErrInvalidClient.WithHint("client is disabled"))
+		return
+	}
+
 	if accessReq.GetGrantTypes().ExactOne("client_credentials") {
 		for _, scope := range accessReq.GetRequestedScopes() {
 			accessReq.GrantScope(scope)
@@ -258,6 +273,20 @@ func (h *OIDCHandler) Introspect(w http.ResponseWriter, r *http.Request) {
 		h.provider.WriteIntrospectionError(ctx, w, err)
 		return
 	}
+
+	// Check if the client is disabled - if so, return inactive token
+	if resp.IsActive() {
+		clientID := resp.GetAccessRequester().GetClient().GetID()
+		client, err := h.clientSvc.GetClientByClientID(ctx, clientID)
+		if err == nil && !client.IsActive {
+			// Return an inactive response
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"active":false}`))
+			return
+		}
+	}
+
 	h.provider.WriteIntrospectionResponse(ctx, w, resp)
 }
 
@@ -268,6 +297,13 @@ func (h *OIDCHandler) UserInfo(w http.ResponseWriter, r *http.Request) {
 	_, ar, err := h.provider.IntrospectToken(ctx, fosite.AccessTokenFromRequest(r), fosite.AccessToken, session)
 	if err != nil {
 		Error(w, http.StatusUnauthorized, "invalid_token", err.Error())
+		return
+	}
+
+	// Check if the client is disabled
+	client, err := h.clientSvc.GetClientByClientID(ctx, ar.GetClient().GetID())
+	if err == nil && !client.IsActive {
+		Error(w, http.StatusUnauthorized, "invalid_client", "client is disabled")
 		return
 	}
 

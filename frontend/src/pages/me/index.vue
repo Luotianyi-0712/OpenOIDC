@@ -2,14 +2,18 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/api/client'
-import { Loader2, Check, BadgeCheck, AtSign, KeyRound, UserPen, ImagePlus, Mail, X, Fingerprint, Plus, Trash2, Pencil, Eye, EyeOff } from 'lucide-vue-next'
+import { Loader2, Check, BadgeCheck, AtSign, KeyRound, UserPen, ImagePlus, Mail, X, Fingerprint, Plus, Trash2, Pencil, Eye, EyeOff, Bell } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { usePasswordPolicy } from '@/composables/usePasswordPolicy'
 import { usePasskey, type PasskeyCredential } from '@/composables/usePasskey'
+import { useToastStore } from '@/stores/toast'
+import { usePublicConfig } from '@/composables/usePublicConfig'
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const toast = useToastStore()
 const { policy, hasRequirements, validate } = usePasswordPolicy()
+const { settings: publicSettings } = usePublicConfig()
 
 // Profile form
 const displayName = ref('')
@@ -59,11 +63,16 @@ const verificationSending = ref(false)
 const verificationSent = ref(false)
 const verificationError = ref('')
 
+// Notification preferences
+const riskReportEmailEnabled = ref(true)
+const notificationLoading = ref(false)
+
 onMounted(() => {
   if (auth.user) {
     displayName.value = auth.user.display_name
     avatarUrl.value = auth.user.avatar_url
     alias.value = auth.user.alias || ''
+    riskReportEmailEnabled.value = auth.user.risk_report_email_enabled ?? true
   }
   fetchPasskeys()
 })
@@ -184,6 +193,21 @@ function formatPasskeyDate(iso: string | null) {
   if (!iso) return '-'
   return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+
+async function updateNotificationPreferences() {
+  notificationLoading.value = true
+  try {
+    await api.put('/me', {
+      risk_report_email_enabled: riskReportEmailEnabled.value,
+    })
+    await auth.fetchUser()
+    toast.success(t('profile.notificationPreferencesSaved'))
+  } catch (e: any) {
+    toast.error(e.message || t('profile.notificationPreferencesFailed'))
+  } finally {
+    notificationLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -259,6 +283,31 @@ function formatPasskeyDate(iso: string | null) {
         <div class="rounded-lg bg-muted/40 px-4 py-3">
           <div class="text-xs text-muted-foreground mb-1">{{ $t('profile.accountCreated') }}</div>
           <div>{{ auth.user?.created_at ? new Date(auth.user.created_at).toLocaleDateString('zh-CN') : '-' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Preferences -->
+    <div v-if="publicSettings.risk_report_email_notification_enabled" class="py-8 border-b border-border">
+      <h3 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-5 flex items-center gap-2">
+        <Bell class="w-4 h-4" /> {{ $t('profile.notificationPreferences') }}
+      </h3>
+      <div class="max-w-2xl space-y-4">
+        <div class="rounded-lg border border-border bg-muted/20 p-4">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              v-model="riskReportEmailEnabled"
+              @change="updateNotificationPreferences"
+              :disabled="notificationLoading"
+              class="mt-0.5 w-4 h-4 rounded border-gray-300 text-foreground focus:ring-2 focus:ring-foreground/20 disabled:opacity-50"
+            />
+            <div class="flex-1">
+              <div class="text-sm font-medium">{{ $t('profile.riskReportEmailNotifications') }}</div>
+              <div class="text-xs text-muted-foreground mt-1">{{ $t('profile.riskReportEmailHint') }}</div>
+            </div>
+            <Loader2 v-if="notificationLoading" class="w-4 h-4 animate-spin text-muted-foreground shrink-0" />
+          </label>
         </div>
       </div>
     </div>

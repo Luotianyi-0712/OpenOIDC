@@ -135,6 +135,84 @@ This link expires in 1 hour. If you didn't request this, please ignore this emai
 	return s.send(ctx, to, subject, body)
 }
 
+func (s *Sender) SendRiskReportResolved(ctx context.Context, to, reportID, outcome, reason string) error {
+	var subject, body string
+
+	if outcome == "confirmed" {
+		subject = "举报已确认 / Report Confirmed"
+		if reason != "" {
+			body = fmt.Sprintf(`您好，
+
+您提交的举报（ID: %s）已被管理员确认。
+
+管理员备注：%s
+
+感谢您帮助维护平台安全。
+
+---
+Hello,
+
+Your report (ID: %s) has been confirmed by an administrator.
+
+Admin note: %s
+
+Thank you for helping keep the platform safe.
+`, reportID, reason, reportID, reason)
+		} else {
+			body = fmt.Sprintf(`您好，
+
+您提交的举报（ID: %s）已被管理员确认。
+
+感谢您帮助维护平台安全。
+
+---
+Hello,
+
+Your report (ID: %s) has been confirmed by an administrator.
+
+Thank you for helping keep the platform safe.
+`, reportID, reportID)
+		}
+	} else {
+		subject = "举报已驳回 / Report Dismissed"
+		if reason != "" {
+			body = fmt.Sprintf(`您好，
+
+您提交的举报（ID: %s）已被管理员驳回。
+
+驳回原因：%s
+
+如有疑问，请联系管理员。
+
+---
+Hello,
+
+Your report (ID: %s) has been dismissed by an administrator.
+
+Reason: %s
+
+If you have questions, please contact an administrator.
+`, reportID, reason, reportID, reason)
+		} else {
+			body = fmt.Sprintf(`您好，
+
+您提交的举报（ID: %s）已被管理员驳回。
+
+如有疑问，请联系管理员。
+
+---
+Hello,
+
+Your report (ID: %s) has been dismissed by an administrator.
+
+If you have questions, please contact an administrator.
+`, reportID, reportID)
+		}
+	}
+
+	return s.send(ctx, to, subject, body)
+}
+
 func (s *Sender) send(ctx context.Context, to, subject, body string) error {
 	host, port, username, password, from := s.getConfig(ctx)
 

@@ -20,7 +20,11 @@ const (
 	linuxDOBaseURL  = "https://linux.do"
 )
 
-func NewLinuxDOProvider(clientID, clientSecret string) *OAuth2Provider {
+func NewLinuxDOProvider(clientID, clientSecret string, scopes []string) *OAuth2Provider {
+	// Default scopes if not configured
+	if len(scopes) == 0 {
+		scopes = []string{"user"}
+	}
 	return &OAuth2Provider{
 		name: domain.ProviderLinuxDO,
 		config: &oauth2.Config{
@@ -31,7 +35,7 @@ func NewLinuxDOProvider(clientID, clientSecret string) *OAuth2Provider {
 				TokenURL:  linuxDOTokenURL,
 				AuthStyle: oauth2.AuthStyleInParams,
 			},
-			Scopes: []string{"user"},
+			Scopes: scopes,
 		},
 		userURL:   linuxDOUserURL,
 		parseUser: parseLinuxDOUser,

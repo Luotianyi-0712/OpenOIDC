@@ -162,7 +162,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	clientSvc := service.NewClientService(clientRepo, accessRuleRepo, auditRepo, secretCipher)
 	adminSvc := service.NewAdminService(userRepo, providerCfgRepo, settingsRepo, aliasRepo, signingKeyRepo, auditRepo, passkeyRepo, cfg.Security)
 	accessCtrl := service.NewAccessControlService(accessRuleRepo, aliasRepo)
-	riskSvc := service.NewRiskService(riskReportRepo, riskListRepo, bindingRepo, userRepo, auditRepo, securitySvc)
+	riskSvc := service.NewRiskService(riskReportRepo, riskListRepo, bindingRepo, userRepo, auditRepo, securitySvc, emailSender)
 
 	// Passkey service.
 	passkeySvc, err := service.NewPasskeyService(passkeyRepo, userRepo, sessionRepo, cache, settingsRepo, cfg)
@@ -189,7 +189,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	// Handlers.
 	authHandler := handler.NewAuthHandler(authSvc, sessionSvc, cfg.Session)
 	socialHandler := handler.NewSocialHandler(socialSvc, socialRegistry, sessionSvc, cfg.Session)
-	userInfoHandler := handler.NewUserInfoHandler(userRepo, socialSvc, securitySvc, accessCtrl, authSvc, sessionSvc, consentRepo, auditRepo)
+	userInfoHandler := handler.NewUserInfoHandler(userRepo, socialSvc, securitySvc, accessCtrl, authSvc, sessionSvc, consentRepo, auditRepo, riskSvc, clientSvc)
 	adminHandler := handler.NewAdminHandler(adminSvc, clientSvc, securitySvc, userRepo, socialRegistry, riskSvc, sessionRepo, bindingRepo, consentRepo, cacheSvc)
 	oidcHandler := handler.NewOIDCHandler(provider, userRepo, clientSvc, accessCtrl, sessionSvc, settingsRepo, cfg.Server, "/login")
 	oidcHandler.SetCache(cache)
@@ -264,21 +264,21 @@ func buildSocialRegistry(cfg *config.Config, providerCfgRepo port.ProviderConfig
 		var p port.SocialProvider
 		switch name {
 		case domain.ProviderGitHub:
-			p = social.NewGitHubProvider(pcfg.ClientID, pcfg.ClientSecret)
+			p = social.NewGitHubProvider(pcfg.ClientID, pcfg.ClientSecret, pcfg.Scopes)
 		case domain.ProviderGoogle:
-			p = social.NewGoogleProvider(pcfg.ClientID, pcfg.ClientSecret)
+			p = social.NewGoogleProvider(pcfg.ClientID, pcfg.ClientSecret, pcfg.Scopes)
 		case domain.ProviderGitLab:
-			p = social.NewGitLabProvider(pcfg.ClientID, pcfg.ClientSecret, "")
+			p = social.NewGitLabProvider(pcfg.ClientID, pcfg.ClientSecret, "", pcfg.Scopes)
 		case domain.ProviderGitee:
-			p = social.NewGiteeProvider(pcfg.ClientID, pcfg.ClientSecret)
+			p = social.NewGiteeProvider(pcfg.ClientID, pcfg.ClientSecret, pcfg.Scopes)
 		case domain.ProviderLinuxDO:
-			p = social.NewLinuxDOProvider(pcfg.ClientID, pcfg.ClientSecret)
+			p = social.NewLinuxDOProvider(pcfg.ClientID, pcfg.ClientSecret, pcfg.Scopes)
 		case domain.ProviderDiscord:
-			p = social.NewDiscordProvider(pcfg.ClientID, pcfg.ClientSecret)
+			p = social.NewDiscordProvider(pcfg.ClientID, pcfg.ClientSecret, pcfg.Scopes)
 		case domain.ProviderMicrosoft:
-			p = social.NewMicrosoftProvider(pcfg.ClientID, pcfg.ClientSecret, "")
+			p = social.NewMicrosoftProvider(pcfg.ClientID, pcfg.ClientSecret, "", pcfg.Scopes)
 		case domain.ProviderQQ:
-			p = social.NewQQProvider(pcfg.ClientID, pcfg.ClientSecret)
+			p = social.NewQQProvider(pcfg.ClientID, pcfg.ClientSecret, pcfg.Scopes)
 		case domain.ProviderWeChat:
 			p = social.NewWeChatProvider(pcfg.AppID, pcfg.AppSecret)
 		case domain.ProviderTelegram:

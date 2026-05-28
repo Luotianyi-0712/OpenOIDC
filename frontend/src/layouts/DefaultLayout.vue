@@ -2,7 +2,7 @@
 import { RouterLink, RouterView } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { Fingerprint, Menu, X, ChevronDown, Github, Mail } from 'lucide-vue-next'
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { setLocale, currentLocale } from '@/i18n'
 import { usePublicConfig } from '@/composables/usePublicConfig'
 
@@ -10,6 +10,12 @@ const auth = useAuthStore()
 const { settings } = usePublicConfig()
 const mobileOpen = ref(false)
 const locale = ref(currentLocale())
+
+onMounted(() => {
+  if (auth.isLoggedIn && !auth.developerStatus) {
+    auth.fetchDeveloperStatus()
+  }
+})
 
 // Desktop dropdown state — tracks hover timeout per menu
 const activeDropdown = ref<string | null>(null)

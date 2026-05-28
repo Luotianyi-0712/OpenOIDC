@@ -25,10 +25,19 @@ const (
 type QQProvider struct {
 	clientID     string
 	clientSecret string
+	scopes       []string
 }
 
-func NewQQProvider(clientID, clientSecret string) *QQProvider {
-	return &QQProvider{clientID: clientID, clientSecret: clientSecret}
+func NewQQProvider(clientID, clientSecret string, scopes []string) *QQProvider {
+	// Default scopes if not configured
+	if len(scopes) == 0 {
+		scopes = []string{"get_user_info"}
+	}
+	return &QQProvider{
+		clientID:     clientID,
+		clientSecret: clientSecret,
+		scopes:       scopes,
+	}
 }
 
 func (p *QQProvider) Name() string { return domain.ProviderQQ }
@@ -39,7 +48,7 @@ func (p *QQProvider) BeginAuth(_ context.Context, state, redirectURL string) (st
 	params.Set("client_id", p.clientID)
 	params.Set("redirect_uri", redirectURL)
 	params.Set("state", state)
-	params.Set("scope", "get_user_info")
+	params.Set("scope", strings.Join(p.scopes, ","))
 	return qqAuthURL + "?" + params.Encode(), nil
 }
 
@@ -125,7 +134,7 @@ func (p *QQProvider) RefreshToken(ctx context.Context, refreshToken string) (*po
 	if err != nil {
 		return nil, err
 	}
-	return parseQQTokenResponse(string(body))
+	return parseQQTokenResponse(string(body), p.scopes)
 }
 
 func (p *QQProvider) ValidateToken(ctx context.Context, accessToken string) (*port.ProviderUserInfo, error) {
@@ -177,7 +186,7 @@ func (p *QQProvider) exchangeCode(ctx context.Context, code, redirectURL string)
 	if err != nil {
 		return nil, err
 	}
-	return parseQQTokenResponse(string(body))
+	return parseQQTokenResponse(string(body), p.scopes)
 }
 
 // parseQQTokenResponse handles the query-string response, e.g.:
@@ -185,7 +194,7 @@ func (p *QQProvider) exchangeCode(ctx context.Context, code, redirectURL string)
 //	access_token=FE04...&expires_in=7776000&refresh_token=88E4...
 //
 // On error the body may also be JSON: {"error":1,"error_description":"..."}
-func parseQQTokenResponse(body string) (*port.ProviderTokenInfo, error) {
+func parseQQTokenResponse(body string, scopes []string) (*port.ProviderTokenInfo, error) {
 	body = strings.TrimSpace(body)
 	if strings.HasPrefix(body, "{") {
 		var errResp struct {
@@ -214,7 +223,7 @@ func parseQQTokenResponse(body string) (*port.ProviderTokenInfo, error) {
 		RefreshToken: values.Get("refresh_token"),
 		Expiry:       expiry,
 		TokenType:    "Bearer",
-		Scopes:       []string{"get_user_info"},
+		Scopes:       scopes,
 	}, nil
 }
 

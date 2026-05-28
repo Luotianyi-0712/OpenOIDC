@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { api } from '@/api/client'
-import { Plus, Pencil, Trash2, Loader2, RefreshCw, X, MinusCircle } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, Loader2, RefreshCw, X, MinusCircle, Copy } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import ConditionItemEditor from '@/components/ConditionItemEditor.vue'
 
 const { t } = useI18n()
 
@@ -33,6 +34,17 @@ type RuleCondition = {
   min_binding_days?: number
 }
 
+// New nested structure
+type ConditionItem = {
+  condition?: RuleCondition
+  group?: ConditionGroup
+}
+
+type ConditionGroup = {
+  operator: RuleOperator
+  items: ConditionItem[]
+}
+
 interface SecurityRule {
   id: string
   name: string
@@ -41,7 +53,8 @@ interface SecurityRule {
   priority: number
   conditions: {
     operator: RuleOperator
-    rules: RuleCondition[]
+    rules: RuleCondition[] // Old flat structure for backward compatibility
+    items?: ConditionItem[] // New nested structure
   }
   is_active: boolean
   created_at: string
@@ -77,7 +90,7 @@ const form = ref({
   level: 1,
   priority: 0,
   operator: 'AND' as RuleOperator,
-  conditions: [] as RuleCondition[],
+  items: [] as ConditionItem[], // New nested structure
   is_active: true,
 })
 
@@ -190,7 +203,7 @@ const defaultCondition = (): RuleCondition => ({
   provider: 'github',
 })
 
-const hasConditions = computed(() => form.value.conditions.length > 0)
+const hasConditions = computed(() => form.value.items.length > 0)
 
 onMounted(fetchRules)
 
@@ -216,7 +229,7 @@ function openCreate() {
     level: 1,
     priority: 0,
     operator: 'AND',
-    conditions: [defaultCondition()],
+    items: [{ condition: defaultCondition() }],
     is_active: true,
   }
   showModal.value = true
@@ -225,24 +238,76 @@ function openCreate() {
 function openEdit(rule: SecurityRule) {
   isCreate.value = false
   editingRule.value = rule
+
+  // Convert old flat structure to new nested structure if needed
+  let items: ConditionItem[] = []
+  if (rule.conditions?.items && rule.conditions.items.length > 0) {
+    // Already using new nested structure
+    items = JSON.parse(JSON.stringify(rule.conditions.items))
+  } else if (rule.conditions?.rules && rule.conditions.rules.length > 0) {
+    // Convert old flat structure to nested
+    items = rule.conditions.rules.map(c => ({ condition: normalizeConditionForEdit(c) }))
+  } else {
+    items = [{ condition: defaultCondition() }]
+  }
+
   form.value = {
     name: rule.name,
     description: rule.description,
     level: rule.level,
     priority: rule.priority,
     operator: rule.conditions?.operator || 'AND',
-    conditions: rule.conditions?.rules?.length ? rule.conditions.rules.map(normalizeConditionForEdit) : [defaultCondition()],
+    items: items,
+    is_active: rule.is_active,
+  }
+  showModal.value = true
+}
+
+function openCopy(rule: SecurityRule) {
+  isCreate.value = true
+  editingRule.value = null
+
+  // Convert old flat structure to new nested structure if needed
+  let items: ConditionItem[] = []
+  if (rule.conditions?.items && rule.conditions.items.length > 0) {
+    items = JSON.parse(JSON.stringify(rule.conditions.items))
+  } else if (rule.conditions?.rules && rule.conditions.rules.length > 0) {
+    items = rule.conditions.rules.map(c => ({ condition: normalizeConditionForEdit(c) }))
+  } else {
+    items = [{ condition: defaultCondition() }]
+  }
+
+  form.value = {
+    name: rule.name + ' (Copy)',
+    description: rule.description,
+    level: rule.level,
+    priority: rule.priority,
+    operator: rule.conditions?.operator || 'AND',
+    items: items,
     is_active: rule.is_active,
   }
   showModal.value = true
 }
 
 function addCondition() {
-  form.value.conditions.push(defaultCondition())
+  form.value.items.push({ condition: defaultCondition() })
 }
 
-function removeCondition(index: number) {
-  form.value.conditions.splice(index, 1)
+function addGroup() {
+  form.value.items.push({
+    group: {
+      operator: 'AND',
+      items: [{ condition: defaultCondition() }],
+    },
+  })
+}
+
+function removeItem(index: number) {
+  form.value.items.splice(index, 1)
+}
+
+function updateItem(index: number, newItem: ConditionItem) {
+  form.value.items[index] = newItem
 }
 
 function conditionOption(type?: string) {
@@ -375,6 +440,26 @@ function buildConditionPayload(cond: RuleCondition): RuleCondition {
   return payload
 }
 
+function buildConditionItems(items: ConditionItem[]): ConditionItem[] {
+  return items.map(item => {
+    if (item.group) {
+      // Recursively build nested group
+      return {
+        group: {
+          operator: item.group.operator,
+          items: buildConditionItems(item.group.items),
+        },
+      }
+    } else if (item.condition) {
+      // Build single condition
+      return {
+        condition: buildConditionPayload(item.condition),
+      }
+    }
+    return item
+  })
+}
+
 async function saveRule() {
   saving.value = true
   error.value = ''
@@ -386,7 +471,7 @@ async function saveRule() {
       priority: form.value.priority,
       conditions: {
         operator: form.value.operator,
-        rules: form.value.conditions.map(buildConditionPayload),
+        items: buildConditionItems(form.value.items),
       },
       is_active: form.value.is_active,
     }
@@ -440,9 +525,26 @@ async function recomputeAll() {
 }
 
 function conditionSummary(rule: SecurityRule) {
+  // Support new nested structure
+  if (rule.conditions?.items && rule.conditions.items.length > 0) {
+    return conditionItemsSummary(rule.conditions.items, rule.conditions.operator)
+  }
+  // Fallback to old flat structure
   if (!rule.conditions?.rules?.length) return '-'
   const op = rule.conditions.operator === 'OR' ? ` ${t('adminRules.conditionOrShort')} ` : ` ${t('adminRules.conditionAndShort')} `
   return rule.conditions.rules.map(conditionLabel).join(op)
+}
+
+function conditionItemsSummary(items: ConditionItem[], operator: RuleOperator): string {
+  const op = operator === 'OR' ? ` ${t('adminRules.conditionOrShort')} ` : ` ${t('adminRules.conditionAndShort')} `
+  return items.map(item => {
+    if (item.group) {
+      return `(${conditionItemsSummary(item.group.items, item.group.operator)})`
+    } else if (item.condition) {
+      return conditionLabel(item.condition)
+    }
+    return ''
+  }).filter(Boolean).join(op)
 }
 
 function conditionLabel(condition: RuleCondition) {
@@ -531,12 +633,12 @@ function formatValue(cond: RuleCondition) {
           <tr v-for="rule in rules" :key="rule.id" class="hover:bg-muted/30 transition-colors">
             <td class="px-4 py-3">
               <div class="font-medium">{{ rule.name }}</div>
-              <div class="text-xs text-muted-foreground max-w-48 truncate">{{ rule.description }}</div>
+              <div class="text-xs text-muted-foreground break-words">{{ rule.description }}</div>
             </td>
             <td class="px-4 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-foreground/10">L{{ rule.level }}</span>
             </td>
-            <td class="px-4 py-3 text-muted-foreground text-xs max-w-96 truncate">{{ conditionSummary(rule) }}</td>
+            <td class="px-4 py-3 text-muted-foreground text-xs break-words">{{ conditionSummary(rule) }}</td>
             <td class="px-4 py-3 text-muted-foreground">{{ rule.priority }}</td>
             <td class="px-4 py-3">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="rule.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'">
@@ -547,6 +649,9 @@ function formatValue(cond: RuleCondition) {
               <div class="flex items-center gap-1">
                 <button @click="openEdit(rule)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
                   <Pencil class="w-3 h-3" /> {{ $t('edit') }}
+                </button>
+                <button @click="openCopy(rule)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
+                  <Copy class="w-3 h-3" /> {{ $t('copy') }}
                 </button>
                 <button @click="confirmDelete(rule)" class="text-xs font-medium px-2 py-1 rounded hover:bg-destructive/5 transition-colors text-destructive flex items-center gap-1">
                   <Trash2 class="w-3 h-3" /> {{ $t('delete') }}
@@ -572,9 +677,12 @@ function formatValue(cond: RuleCondition) {
           </span>
         </div>
         <div class="text-xs text-muted-foreground break-words"><span class="font-medium text-foreground">{{ $t('adminRules.conditions') }}：</span>{{ conditionSummary(rule) }}</div>
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-3 gap-2">
           <button @click="openEdit(rule)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
             <Pencil class="w-3 h-3" /> {{ $t('edit') }}
+          </button>
+          <button @click="openCopy(rule)" class="text-xs font-medium px-2 py-2 rounded border border-border hover:bg-muted transition-colors flex items-center justify-center gap-1">
+            <Copy class="w-3 h-3" /> {{ $t('copy') }}
           </button>
           <button @click="confirmDelete(rule)" class="text-xs font-medium px-2 py-2 rounded border border-destructive/30 hover:bg-destructive/5 transition-colors text-destructive flex items-center justify-center gap-1">
             <Trash2 class="w-3 h-3" /> {{ $t('delete') }}
@@ -620,78 +728,29 @@ function formatValue(cond: RuleCondition) {
               </select>
             </div>
             <div v-if="!hasConditions" class="text-xs text-muted-foreground text-center py-3">{{ $t('adminRules.noConditions') }}</div>
-            <div v-for="(cond, i) in form.conditions" :key="i" class="rounded-lg border border-border/70 p-3 mb-3 bg-muted/10">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.conditionType') }}</label>
-                  <select v-model="cond.type" @change="onTypeChange(cond)" class="w-full px-2 py-1.5 border border-border rounded-lg text-sm">
-                    <option v-for="option in conditionOptions" :key="option.type" :value="option.type">
-                      {{ $t(`adminRules.conditionTypes.${option.type}`) }}
-                    </option>
-                  </select>
-                </div>
 
-                <div v-if="conditionOption(cond.type).needsProvider">
-                  <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.conditionProvider') }}</label>
-                  <input v-model="cond.provider" @change="onProviderChange(cond)" :list="`security-rule-provider-options-${i}`" :placeholder="conditionOption(cond.type).supportsAnyProvider ? $t('adminRules.anyProviderPlaceholder') : $t('adminRules.providerPlaceholder')" class="w-full px-2 py-1.5 border border-border rounded-lg text-sm" />
-                  <datalist :id="`security-rule-provider-options-${i}`">
-                    <option v-for="p in providerOptions" :key="p" :value="p">
-                      {{ $t(`adminRules.providerOptions.${p}`) }}
-                    </option>
-                  </datalist>
-                </div>
+            <!-- Nested Condition Items -->
+            <ConditionItemEditor
+              v-for="(item, i) in form.items"
+              :key="i"
+              :item="item"
+              :index="i"
+              :depth="0"
+              :condition-options="conditionOptions"
+              :provider-options="providerOptions"
+              @remove="removeItem(i)"
+              @update="updateItem(i, $event)"
+            />
 
-                <div v-if="conditionOption(cond.type).needsField">
-                  <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.field') }}</label>
-                  <input v-model="cond.field" :list="`security-rule-field-options-${i}`" :placeholder="$t('adminRules.fieldPlaceholder')" class="w-full px-2 py-1.5 border border-border rounded-lg text-sm" />
-                  <datalist :id="`security-rule-field-options-${i}`">
-                    <option v-for="field in fieldOptions(cond)" :key="field.value" :value="field.value">
-                      {{ $t(`adminRules.fieldOptions.${field.labelKey}`) }}
-                    </option>
-                  </datalist>
-                </div>
-
-                <div v-if="operatorOptions(cond).length">
-                  <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.operator') }}</label>
-                  <select v-model="cond.operator" class="w-full px-2 py-1.5 border border-border rounded-lg text-sm">
-                    <option v-for="op in operatorOptions(cond)" :key="op" :value="op">{{ $t(`adminRules.operatorOptions.${op}`) }}</option>
-                  </select>
-                </div>
-
-                <div v-if="conditionOption(cond.type).valueType === 'number'">
-                  <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.value') }}</label>
-                  <input v-model.number="cond.value" type="number" min="0" class="w-full px-2 py-1.5 border border-border rounded-lg text-sm" />
-                </div>
-
-                <div v-else-if="conditionOption(cond.type).valueType === 'string'">
-                  <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.value') }}</label>
-                  <input v-model="cond.value" type="text" class="w-full px-2 py-1.5 border border-border rounded-lg text-sm" />
-                </div>
-
-                <div v-else-if="conditionOption(cond.type).valueType === 'domains'">
-                  <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.domains') }}</label>
-                  <input :value="valuesText(cond)" @input="handleValuesInput(cond, $event)" type="text" :placeholder="$t('adminRules.domainsPlaceholder')" class="w-full px-2 py-1.5 border border-border rounded-lg text-sm" />
-                </div>
-
-                <div v-else-if="conditionOption(cond.type).valueType === 'bool'">
-                  <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.value') }}</label>
-                  <select v-model="cond.value" class="w-full px-2 py-1.5 border border-border rounded-lg text-sm">
-                    <option :value="true">{{ $t('yes') }}</option>
-                    <option :value="false">{{ $t('no') }}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="flex flex-col gap-2 mt-3 sm:flex-row sm:items-center sm:justify-between">
-                <p class="text-xs text-muted-foreground break-words">{{ conditionLabel(cond) }}</p>
-                <button type="button" @click="removeCondition(i)" class="text-destructive hover:text-destructive/80 flex items-center gap-1 text-xs shrink-0">
-                  <MinusCircle class="w-4 h-4" /> {{ $t('adminRules.removeCondition') }}
-                </button>
-              </div>
+            <!-- Add Buttons -->
+            <div class="flex gap-2 mt-2">
+              <button type="button" @click="addCondition" class="text-xs px-3 py-1.5 bg-foreground text-white rounded-lg hover:bg-foreground/90 transition-colors flex items-center gap-1">
+                <Plus class="w-3 h-3" /> {{ $t('adminRules.addCondition') }}
+              </button>
+              <button type="button" @click="addGroup" class="text-xs px-3 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-1">
+                <Plus class="w-3 h-3" /> {{ $t('adminRules.addGroup') }}
+              </button>
             </div>
-            <button type="button" @click="addCondition" class="text-xs text-foreground/70 hover:text-foreground mt-1 flex items-center gap-1">
-              <Plus class="w-3 h-3" /> {{ $t('adminRules.addCondition') }}
-            </button>
           </div>
 
           <label class="flex items-center gap-2 text-sm font-medium cursor-pointer">

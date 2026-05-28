@@ -33,14 +33,18 @@ type githubEmail struct {
 	Verified bool   `json:"verified"`
 }
 
-func NewGitHubProvider(clientID, clientSecret string) *OAuth2Provider {
+func NewGitHubProvider(clientID, clientSecret string, scopes []string) *OAuth2Provider {
+	// Default scopes if not configured
+	if len(scopes) == 0 {
+		scopes = []string{"read:user", "user:email"}
+	}
 	return &OAuth2Provider{
 		name: domain.ProviderGitHub,
 		config: &oauth2.Config{
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
 			Endpoint:     github.Endpoint,
-			Scopes:       []string{"read:user", "user:email"},
+			Scopes:       scopes,
 		},
 		userURL:   "https://api.github.com/user",
 		fetchUser: fetchGitHubUser,

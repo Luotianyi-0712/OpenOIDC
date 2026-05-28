@@ -70,7 +70,7 @@ func scanUser(row pgx.Row) (*domain.User, error) {
 	var status string
 	err := row.Scan(
 		&u.ID, &u.UID, &u.Email, &u.EmailVerified, &u.PasswordHash, &u.DisplayName, &alias,
-		&u.AvatarURL, &u.SecurityLevel, &u.Role, &status, &lastLogin,
+		&u.AvatarURL, &u.SecurityLevel, &u.Role, &status, &u.RiskReportEmailEnabled, &lastLogin,
 		&u.CreatedAt, &u.UpdatedAt,
 	)
 	if err != nil {
@@ -87,7 +87,7 @@ func scanUser(row pgx.Row) (*domain.User, error) {
 }
 
 const userSelectColumns = `id, uid, email, email_verified, password_hash, display_name, alias,
-	avatar_url, security_level, role, status, last_login_at, created_at, updated_at`
+	avatar_url, security_level, role, status, risk_report_email_enabled, last_login_at, created_at, updated_at`
 
 func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	query := `SELECT ` + userSelectColumns + ` FROM users WHERE id = $1 AND deleted_at IS NULL`
@@ -152,12 +152,12 @@ func (r *UserRepo) Update(ctx context.Context, u *domain.User) error {
 		UPDATE users SET
 			email = $2, email_verified = $3, display_name = $4, alias = $5,
 			avatar_url = $6, security_level = $7, role = $8, status = $9,
-			updated_at = $10
+			risk_report_email_enabled = $10, updated_at = $11
 		WHERE id = $1
 	`
 	tag, err := r.db.Exec(ctx, query,
 		u.ID, u.Email, u.EmailVerified, u.DisplayName, alias,
-		u.AvatarURL, u.SecurityLevel, u.Role, string(u.Status), u.UpdatedAt,
+		u.AvatarURL, u.SecurityLevel, u.Role, string(u.Status), u.RiskReportEmailEnabled, u.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("update user: %w", err)

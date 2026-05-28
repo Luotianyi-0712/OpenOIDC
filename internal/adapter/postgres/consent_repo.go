@@ -21,16 +21,18 @@ func NewConsentRepo(db *pgxpool.Pool) *ConsentRepo {
 
 func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) ([]*domain.UserAuthorization, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT auth.client_id, oc.name, MIN(auth.created_at) as granted_at
+		`SELECT DISTINCT ON (auth.client_id)
+		        auth.client_id, oc.name, oc.description, oc.logo_url, oc.homepage_url,
+		        u.id, u.uid, u.display_name, u.avatar_url, auth.created_at as granted_at
 			 FROM (
 			   SELECT client_id, subject, created_at FROM oauth2_access_tokens WHERE active = true
 			   UNION ALL
 			   SELECT client_id, subject, created_at FROM oauth2_refresh_tokens WHERE active = true
 			 ) auth
 			 JOIN oidc_clients oc ON oc.client_id = auth.client_id
+			 LEFT JOIN users u ON u.id = oc.owner_user_id
 			 WHERE auth.subject = $1
-			 GROUP BY auth.client_id, oc.name
-			 ORDER BY granted_at DESC`,
+			 ORDER BY auth.client_id, auth.created_at ASC`,
 		userID.String())
 	if err != nil {
 		return nil, err
@@ -40,9 +42,14 @@ func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) 
 	var results []*domain.UserAuthorization
 	for rows.Next() {
 		var clientID, clientName string
+		var description, logoURL, homepageURL *string
+		var devID *uuid.UUID
+		var devUID *int64
+		var devDisplayName, devAvatarURL *string
 		var grantedAt time.Time
 
-		if err := rows.Scan(&clientID, &clientName, &grantedAt); err != nil {
+		if err := rows.Scan(&clientID, &clientName, &description, &logoURL, &homepageURL,
+			&devID, &devUID, &devDisplayName, &devAvatarURL, &grantedAt); err != nil {
 			continue
 		}
 
@@ -54,6 +61,31 @@ func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) 
 			GrantedAt:  grantedAt,
 			LastUsedAt: grantedAt,
 		}
+
+		if description != nil {
+			auth.Description = *description
+		}
+		if logoURL != nil {
+			auth.LogoURL = *logoURL
+		}
+		if homepageURL != nil {
+			auth.HomepageURL = *homepageURL
+		}
+
+		// Parse developer info
+		if devID != nil {
+			auth.Developer.ID = *devID
+		}
+		if devUID != nil {
+			auth.Developer.UID = *devUID
+		}
+		if devDisplayName != nil {
+			auth.Developer.DisplayName = *devDisplayName
+		}
+		if devAvatarURL != nil {
+			auth.Developer.AvatarURL = *devAvatarURL
+		}
+
 		results = append(results, auth)
 	}
 

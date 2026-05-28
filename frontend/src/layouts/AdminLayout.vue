@@ -2,14 +2,21 @@
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { Fingerprint, Users, AppWindow, ShieldCheck, Plug, Settings, ScrollText, KeyRound, LogOut, ArrowLeft, LayoutDashboard, Code2, AlertTriangle } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale, currentLocale } from '@/i18n'
+import Toast from '@/components/Toast.vue'
 
 const { t } = useI18n()
 const auth = useAuthStore()
 const route = useRoute()
 const locale = ref(currentLocale())
+
+onMounted(() => {
+  if (auth.isLoggedIn && !auth.developerStatus) {
+    auth.fetchDeveloperStatus()
+  }
+})
 
 function toggleLocale() {
   const next = locale.value === 'zh' ? 'en' : 'zh'
@@ -36,6 +43,7 @@ function isActive(path: string) {
 
 <template>
   <div class="min-h-screen">
+    <Toast />
     <nav class="fixed top-0 inset-x-0 z-50 bg-white/85 backdrop-blur-xl border-b border-border">
       <div class="max-w-[1200px] mx-auto px-4 sm:px-6 md:px-10 h-16 flex items-center justify-between gap-3">
         <RouterLink to="/" class="flex items-center gap-2.5 font-bold text-lg tracking-tight">

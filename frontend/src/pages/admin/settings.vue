@@ -5,10 +5,12 @@ import { Pencil, Loader2, X, Mail, Save, Eye, EyeOff } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { usePublicConfig } from '@/composables/usePublicConfig'
+import { useToast } from '@/composables/useToast'
 
 const { t } = useI18n()
 const auth = useAuthStore()
 const { settings: publicSettings, loaded: publicConfigLoaded } = usePublicConfig()
+const toast = useToast()
 
 interface Setting {
   key: string
@@ -43,6 +45,7 @@ const BOOL_SETTINGS = new Set([
   'password_require_lower',
   'password_require_digit',
   'password_require_symbol',
+  'risk_report_email_notification_enabled',
 ])
 
 const SMTP_KEYS = ['smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'smtp_from']
@@ -84,8 +87,6 @@ function aliasRuleTypeLabel(type: string) {
 
 const settings = ref<Setting[]>([])
 const loading = ref(false)
-const error = ref('')
-const success = ref('')
 const checkingVersion = ref(false)
 const versionCheck = ref<VersionCheckInfo | null>(null)
 
@@ -147,7 +148,7 @@ async function toggleBool(setting: Setting) {
     await api.put(`/admin/settings/${setting.key}`, { value: newVal, description: setting.description })
     setting.value = newVal
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   }
 }
 
@@ -158,7 +159,6 @@ onMounted(() => {
 
 async function fetchSettings() {
   loading.value = true
-  error.value = ''
   try {
     const res = await api.get<Setting[]>('/admin/settings')
     settings.value = res.data ?? []
@@ -181,7 +181,7 @@ async function fetchSettings() {
       if (s.key === 'developer_min_trust_level') developerMinLevel.value = parseInt(s.value) || 1
     }
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   } finally {
     loading.value = false
   }
@@ -189,12 +189,11 @@ async function fetchSettings() {
 
 async function checkVersionUpdate() {
   checkingVersion.value = true
-  error.value = ''
   try {
     const res = await api.get<VersionCheckInfo>('/admin/version/check')
     versionCheck.value = res.data || null
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   } finally {
     checkingVersion.value = false
   }
@@ -208,13 +207,13 @@ function openEdit(setting: Setting) {
 
 async function saveSetting() {
   saving.value = true
-  error.value = ''
   try {
     await api.put(`/admin/settings/${editingKey.value}`, form.value)
     showModal.value = false
     await fetchSettings()
+    toast.success(t('adminSettings.saved'))
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   } finally {
     saving.value = false
   }
@@ -222,8 +221,6 @@ async function saveSetting() {
 
 async function saveSiteURL() {
   siteSaving.value = true
-  error.value = ''
-  success.value = ''
   try {
     await api.put('/admin/settings/site_url', {
       value: siteURL.value,
@@ -239,10 +236,9 @@ async function saveSiteURL() {
     })
     await fetchSettings()
     await auth.fetchPublicSettings()
-    success.value = t('adminSettings.siteSaved')
-    setTimeout(() => (success.value = ''), 3000)
+    toast.success(t('adminSettings.siteSaved'))
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   } finally {
     siteSaving.value = false
   }
@@ -250,8 +246,6 @@ async function saveSiteURL() {
 
 async function saveSmtp() {
   smtpSaving.value = true
-  error.value = ''
-  success.value = ''
   try {
     await api.put('/admin/settings/smtp_host', { value: smtpForm.value.host, description: 'SMTP server host' })
     await api.put('/admin/settings/smtp_port', { value: smtpForm.value.port, description: 'SMTP server port' })
@@ -260,11 +254,10 @@ async function saveSmtp() {
       await api.put('/admin/settings/smtp_password', { value: smtpForm.value.password, description: 'SMTP password' })
     }
     await api.put('/admin/settings/smtp_from', { value: smtpForm.value.from, description: 'SMTP sender address' })
-    success.value = t('adminSettings.smtpSaved')
-    setTimeout(() => (success.value = ''), 3000)
+    toast.success(t('adminSettings.smtpSaved'))
     await fetchSettings()
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   } finally {
     smtpSaving.value = false
   }
@@ -272,8 +265,6 @@ async function saveSmtp() {
 
 async function saveCaptcha() {
   captchaSaving.value = true
-  error.value = ''
-  success.value = ''
   try {
     await api.put('/admin/settings/captcha_provider', { value: captchaForm.value.provider, description: 'Human verification provider: turnstile or hcaptcha' })
     await api.put('/admin/settings/captcha_site_key', { value: captchaForm.value.siteKey, description: 'Captcha frontend site key' })
@@ -286,10 +277,9 @@ async function saveCaptcha() {
         await api.put('/admin/settings/turnstile_secret_key', { value: captchaForm.value.secretKey, description: 'Cloudflare Turnstile secret key' })
       }
     }
-    success.value = t('adminSettings.captchaSaved')
-    setTimeout(() => (success.value = ''), 3000)
+    toast.success(t('adminSettings.captchaSaved'))
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   } finally {
     captchaSaving.value = false
   }
@@ -297,17 +287,14 @@ async function saveCaptcha() {
 
 async function saveDomainWhitelist() {
   domainSaving.value = true
-  error.value = ''
-  success.value = ''
   try {
     await api.put('/admin/settings/allowed_email_domains', {
       value: domainWhitelist.value,
       description: 'Comma-separated list of allowed email domains for registration. Empty = allow all.',
     })
-    success.value = t('adminSettings.domainSaved')
-    setTimeout(() => (success.value = ''), 3000)
+    toast.success(t('adminSettings.domainSaved'))
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   } finally {
     domainSaving.value = false
   }
@@ -315,8 +302,6 @@ async function saveDomainWhitelist() {
 
 async function saveDeveloperLevel() {
   developerSaving.value = true
-  error.value = ''
-  success.value = ''
   try {
     await api.put('/admin/settings/developer_min_trust_level', {
       value: String(developerMinLevel.value),
@@ -325,10 +310,9 @@ async function saveDeveloperLevel() {
     await fetchSettings()
     await auth.fetchPublicSettings()
     if (auth.isLoggedIn) await auth.fetchDeveloperStatus()
-    success.value = t('adminSettings.developerSaved')
-    setTimeout(() => (success.value = ''), 3000)
+    toast.success(t('adminSettings.developerSaved'))
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   } finally {
     developerSaving.value = false
   }
@@ -339,20 +323,20 @@ async function fetchAliases() {
     const res = await api.get<AliasRestriction[]>('/admin/alias-restrictions')
     aliases.value = res.data ?? []
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   }
 }
 
 async function addAlias() {
   if (!newAlias.value.pattern) return
   aliasAdding.value = true
-  error.value = ''
   try {
     await api.post('/admin/alias-restrictions', newAlias.value)
     newAlias.value = { pattern: '', restriction_type: 'blocked', reason: '' }
     await fetchAliases()
+    toast.success(t('adminSettings.aliasAdded'))
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   } finally {
     aliasAdding.value = false
   }
@@ -362,8 +346,9 @@ async function deleteAlias(id: string) {
   try {
     await api.del(`/admin/alias-restrictions/${id}`)
     aliases.value = aliases.value.filter(a => a.id !== id)
+    toast.success(t('adminSettings.aliasDeleted'))
   } catch (e: any) {
-    error.value = e.message
+    toast.error(e.message)
   }
 }
 </script>
@@ -374,9 +359,6 @@ async function deleteAlias(id: string) {
       <h2 class="text-lg font-semibold">{{ $t('adminSettings.title') }}</h2>
       <p class="text-sm text-muted-foreground mt-1">{{ $t('adminSettings.subtitle') }}</p>
     </div>
-
-    <div v-if="error" class="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{{ error }}</div>
-    <div v-if="success" class="mb-4 rounded-lg border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700">{{ success }}</div>
 
     <div v-if="loading && settings.length === 0" class="flex items-center justify-center py-12 text-muted-foreground">
       <Loader2 class="w-5 h-5 animate-spin mr-2" /> {{ $t('loading') }}
@@ -469,7 +451,7 @@ async function deleteAlias(id: string) {
                 </label>
                 <code v-else class="text-xs bg-muted px-1.5 py-0.5 rounded break-all">{{ setting.value }}</code>
               </td>
-              <td class="px-4 py-3 text-muted-foreground max-w-64 truncate">{{ settingDescription(setting) }}</td>
+              <td class="px-4 py-3 text-muted-foreground text-sm break-words">{{ settingDescription(setting) }}</td>
               <td class="px-4 py-3">
                 <button v-if="!isBoolSetting(setting.key)" @click="openEdit(setting)" class="text-xs font-medium px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1">
                   <Pencil class="w-3 h-3" /> {{ $t('edit') }}

@@ -162,29 +162,29 @@ func buildProvider(cfg *domain.ProviderConfig, clientID, clientSecret string) po
 
 	switch name {
 	case domain.ProviderGitHub:
-		return NewGitHubProvider(clientID, clientSecret)
+		return NewGitHubProvider(clientID, clientSecret, cfg.Scopes)
 	case domain.ProviderGoogle:
-		return NewGoogleProvider(clientID, clientSecret)
+		return NewGoogleProvider(clientID, clientSecret, cfg.Scopes)
 	case domain.ProviderGitLab:
 		var baseURL string
 		if extra != nil {
 			baseURL, _ = extra["base_url"].(string)
 		}
-		return NewGitLabProvider(clientID, clientSecret, baseURL)
+		return NewGitLabProvider(clientID, clientSecret, baseURL, cfg.Scopes)
 	case domain.ProviderGitee:
-		return NewGiteeProvider(clientID, clientSecret)
+		return NewGiteeProvider(clientID, clientSecret, cfg.Scopes)
 	case domain.ProviderLinuxDO:
-		return NewLinuxDOProvider(clientID, clientSecret)
+		return NewLinuxDOProvider(clientID, clientSecret, cfg.Scopes)
 	case domain.ProviderDiscord:
-		return NewDiscordProvider(clientID, clientSecret)
+		return NewDiscordProvider(clientID, clientSecret, cfg.Scopes)
 	case domain.ProviderMicrosoft:
 		var tenantID string
 		if extra != nil {
 			tenantID, _ = extra["tenant_id"].(string)
 		}
-		return NewMicrosoftProvider(clientID, clientSecret, tenantID)
+		return NewMicrosoftProvider(clientID, clientSecret, tenantID, cfg.Scopes)
 	case domain.ProviderQQ:
-		return NewQQProvider(clientID, clientSecret)
+		return NewQQProvider(clientID, clientSecret, cfg.Scopes)
 	case domain.ProviderWeChat:
 		appID := clientID
 		appSecret := clientSecret
@@ -216,7 +216,7 @@ func buildProvider(cfg *domain.ProviderConfig, clientID, clientSecret string) po
 			slog.Warn("apple provider: failed to parse private key", "error", err)
 			return nil
 		}
-		return NewAppleProvider(clientID, teamID, keyID, privKey)
+		return NewAppleProvider(clientID, teamID, keyID, privKey, cfg.Scopes)
 	case domain.ProviderPhone:
 		// Phone provider requires a PhoneCodeVerifier interface which is not
 		// available at registry level. Phone provider is wired separately at

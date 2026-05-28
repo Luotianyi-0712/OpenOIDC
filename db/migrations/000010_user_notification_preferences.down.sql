@@ -1,0 +1,4 @@
+-- Remove notification preferences from users table
+-- SQLite does not support DROP COLUMN before version 3.35.0
+-- For older SQLite versions, this migration cannot be reversed
+-- ALTER TABLE users DROP COLUMN risk_report_email_enabled;
