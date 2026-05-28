@@ -807,6 +807,8 @@ export default {
       suffix: '后缀匹配',
       regex: '正则匹配',
       in: '属于列表',
+      empty: '为空',
+      not_empty: '非空',
     },
     active: '启用此规则',
     recompute: '重新计算全部用户',

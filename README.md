@@ -1,6 +1,6 @@
 # OIDC Platform
 
-Current version: **v1.23**
+Current version: **v1.24**
 
 A self-hosted, developer-oriented identity platform built on top of OpenID Connect / OAuth 2.0. Users register with email and bind third-party accounts (GitHub, Gitee, GitLab, Discord, Google, Microsoft, Apple, Telegram, QQ, WeChat, phone, etc.) to raise their **trust level**. Downstream systems integrate once via standard OIDC and gain low-cost risk control by declaring a minimum trust level plus optional conditions.
 

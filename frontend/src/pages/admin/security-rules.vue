@@ -140,7 +140,7 @@ const conditionOptions: ConditionOption[] = [
 ]
 
 const numberOperators = ['gte', 'gt', 'lte', 'lt', 'eq', 'neq']
-const stringOperators = ['eq', 'neq', 'contains', 'prefix', 'suffix', 'regex', 'in']
+const stringOperators = ['eq', 'neq', 'contains', 'prefix', 'suffix', 'regex', 'in', 'empty', 'not_empty']
 const boolOperators = ['eq', 'neq']
 
 const emailDomainField: FieldOption = { value: 'email_domain', labelKey: 'emailDomain', type: 'string' }

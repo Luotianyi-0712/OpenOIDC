@@ -3,12 +3,28 @@ package social
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
 
 	"golang.org/x/oauth2"
 
 	"github.com/anthropic/oidc-platform/internal/domain"
 	"github.com/anthropic/oidc-platform/internal/port"
 )
+
+// discordEpochMs is Discord's snowflake epoch — first ms of 2015-01-01 UTC.
+const discordEpochMs = 1420070400000
+
+// snowflakeCreatedAt decodes the timestamp embedded in a Discord snowflake ID.
+// Bits 22..63 hold milliseconds since the Discord epoch.
+func snowflakeCreatedAt(id string) (time.Time, bool) {
+	n, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return time.Time{}, false
+	}
+	ms := int64(n>>22) + discordEpochMs
+	return time.UnixMilli(ms).UTC(), true
+}
 
 type discordUser struct {
 	ID            string `json:"id"`
@@ -65,6 +81,9 @@ func NewDiscordProvider(clientID, clientSecret string, scopes []string) *OAuth2P
 				raw = map[string]any{}
 			}
 			raw["email_verified"] = u.Verified
+			if created, ok := snowflakeCreatedAt(u.ID); ok {
+				raw["created_at"] = created.Format(time.RFC3339)
+			}
 			raw = normalizeRawProfile(raw, u.Email)
 			return &port.ProviderUserInfo{
 				ProviderUID:   u.ID,

@@ -299,9 +299,14 @@ func evaluateCondition(c domain.RuleCondition, ctx ruleEvalContext) bool {
 		if c.Field == "" {
 			return false
 		}
+		op := strings.ToLower(strings.TrimSpace(c.Operator))
+		emptyCheck := op == "empty" || op == "not_empty"
 		for _, binding := range bindingCandidates(c, ctx) {
 			actual, ok := rawString(binding.RawProfile, c.Field)
-			if ok && compareString(actual, conditionStrings(c), c.Operator) {
+			if !ok && !emptyCheck {
+				continue
+			}
+			if compareString(actual, conditionStrings(c), c.Operator) {
 				return true
 			}
 		}
@@ -924,11 +929,18 @@ func compareNumber(actual, expected float64, op string) bool {
 }
 
 func compareString(actual string, expected []string, op string) bool {
+	normalizedOp := strings.ToLower(strings.TrimSpace(op))
+	actual = strings.TrimSpace(actual)
+	if normalizedOp == "empty" {
+		return actual == ""
+	}
+	if normalizedOp == "not_empty" {
+		return actual != ""
+	}
 	if len(expected) == 0 {
 		return false
 	}
-	actual = strings.TrimSpace(actual)
-	switch strings.ToLower(strings.TrimSpace(op)) {
+	switch normalizedOp {
 	case "", "eq", "=", "==":
 		return actual == expected[0]
 	case "neq", "!=":

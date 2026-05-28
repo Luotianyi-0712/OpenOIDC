@@ -811,6 +811,8 @@ export default {
       suffix: 'ends with',
       regex: 'regex',
       in: 'in list',
+      empty: 'is empty',
+      not_empty: 'is not empty',
     },
     active: 'Active',
     recompute: 'Recompute All',
