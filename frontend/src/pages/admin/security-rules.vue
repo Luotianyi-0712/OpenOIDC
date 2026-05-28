@@ -164,6 +164,9 @@ const providerFields: Record<string, FieldOption[]> = {
     emailVerifiedField,
     emailDomainField,
     { value: 'hd', labelKey: 'googleHostedDomain', type: 'string' },
+    { value: 'has_phone', labelKey: 'googleHasPhone', type: 'bool' },
+    { value: 'phone_verified', labelKey: 'googlePhoneVerified', type: 'bool' },
+    { value: 'phone_number', labelKey: 'googlePhoneNumber', type: 'string' },
   ],
   discord: [
     emailVerifiedField,
