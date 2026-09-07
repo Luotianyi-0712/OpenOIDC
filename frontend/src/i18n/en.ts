@@ -746,6 +746,8 @@ export default {
     noConditions: 'No conditions added',
     days: 'days',
     conditionTypes: {
+      discord_guild_member: 'Discord server membership',
+      discord_guild_age_days: 'Discord server membership age',
       provider_bound: 'Provider bound',
       binding_age_days: 'Provider binding age',
       provider_account_age_days: 'Provider account age',
@@ -758,6 +760,7 @@ export default {
       user_created_age_days: 'Local user age',
       user_has_verified_email: 'Local user email verified',
     },
+    guildId: 'Guild ID (server ID)',
     providerOptions: {
       github: 'GitHub',
       google: 'Google',

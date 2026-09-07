@@ -330,6 +330,29 @@ func evaluateCondition(c domain.RuleCondition, ctx ruleEvalContext) bool {
 			}
 		}
 		return false
+	case domain.ConditionDiscordGuildMember:
+		member, known := discordGuildMember(ctx.bindings[domain.ProviderDiscord], c.Field)
+		expected := true
+		if c.Value != nil {
+			var ok bool
+			expected, ok = toBool(c.Value)
+			if !ok {
+				return false
+			}
+		}
+		return known && compareBool(member, expected, c.Operator)
+	case domain.ConditionDiscordGuildAgeDays:
+		binding := ctx.bindings[domain.ProviderDiscord]
+		member, known := discordGuildMember(binding, c.Field)
+		if !known || !member {
+			return false
+		}
+		joinedAt, ok := rawValueAtPath(binding.RawProfile, "guilds."+c.Field+".joined_at")
+		if !ok {
+			return false
+		}
+		joined, ok := parseRuleTime(joinedAt)
+		return ok && !joined.IsZero() && !joined.After(ctx.now) && compareNumber(ctx.now.Sub(joined).Hours()/24, float64(conditionDays(c)), c.Operator)
 	case domain.ConditionUserEmailDomain:
 		if ctx.user == nil {
 			return false
@@ -579,6 +602,33 @@ func validateCondition(c domain.RuleCondition) error {
 			return fmt.Errorf("%w: condition field required", ErrInvalidInput)
 		}
 		return nil
+	case domain.ConditionDiscordGuildMember, domain.ConditionDiscordGuildAgeDays:
+		if c.Provider != domain.ProviderDiscord || !domain.IsDiscordGuildID(c.Field) {
+			return fmt.Errorf("%w: Discord condition requires provider discord and a numeric Guild ID in field", ErrInvalidInput)
+		}
+		if c.Type == domain.ConditionDiscordGuildMember {
+			if c.Value != nil {
+				if _, ok := toBool(c.Value); !ok {
+					return fmt.Errorf("%w: member value must be boolean", ErrInvalidInput)
+				}
+			}
+			switch c.Operator {
+			case "eq", "neq", "=", "==", "!=":
+				return nil
+			}
+		} else {
+			if c.Value != nil {
+				n, ok := toFloat64(c.Value)
+				if !ok || math.IsNaN(n) || math.IsInf(n, 0) || n < 0 || n >= float64(^uint(0)>>1) || math.Trunc(n) != n {
+					return fmt.Errorf("%w: days must be a non-negative integer within the supported range", ErrInvalidInput)
+				}
+			}
+			switch c.Operator {
+			case "gte", "gt", "lte", "lt", "eq", "neq", ">=", ">", "<=", "<", "=", "==", "!=", "min":
+				return nil
+			}
+		}
+		return fmt.Errorf("%w: unsupported Discord condition operator", ErrInvalidInput)
 	default:
 		return fmt.Errorf("%w: unsupported condition type %q", ErrInvalidInput, c.Type)
 	}
@@ -640,6 +690,9 @@ func normalizeCondition(c domain.RuleCondition) domain.RuleCondition {
 	c.Provider = strings.TrimSpace(c.Provider)
 	c.Field = strings.TrimSpace(c.Field)
 	c.Operator = strings.ToLower(strings.TrimSpace(c.Operator))
+	if (c.Type == domain.ConditionDiscordGuildMember || c.Type == domain.ConditionDiscordGuildAgeDays) && c.Provider == "" {
+		c.Provider = domain.ProviderDiscord
+	}
 
 	switch c.Type {
 	case "":
@@ -688,8 +741,11 @@ func normalizeCondition(c domain.RuleCondition) domain.RuleCondition {
 			c.Operator = "eq"
 		case domain.ConditionProviderRawBool,
 			domain.ConditionProviderEmailVerified,
-			domain.ConditionUserHasVerifiedEmail:
+			domain.ConditionUserHasVerifiedEmail,
+			domain.ConditionDiscordGuildMember:
 			c.Operator = "eq"
+		case domain.ConditionDiscordGuildAgeDays:
+			c.Operator = "gte"
 		}
 	}
 	return c
@@ -704,11 +760,20 @@ func providerCondition(t domain.RuleConditionType) bool {
 		domain.ConditionProviderEmailDomain,
 		domain.ConditionProviderRawNumber,
 		domain.ConditionProviderRawString,
-		domain.ConditionProviderRawBool:
+		domain.ConditionProviderRawBool,
+		domain.ConditionDiscordGuildMember,
+		domain.ConditionDiscordGuildAgeDays:
 		return true
 	default:
 		return false
 	}
+}
+
+func discordGuildMember(binding *domain.SocialBinding, guildID string) (bool, bool) {
+	if binding == nil || strings.TrimSpace(guildID) == "" {
+		return false, false
+	}
+	return rawBool(binding.RawProfile, "guilds."+strings.TrimSpace(guildID)+".is_member")
 }
 
 // flattenConditionItems recursively flattens nested condition items into a flat list

@@ -274,7 +274,7 @@ func buildSocialRegistry(cfg *config.Config, providerCfgRepo port.ProviderConfig
 		case domain.ProviderLinuxDO:
 			p = social.NewLinuxDOProvider(pcfg.ClientID, pcfg.ClientSecret, pcfg.Scopes)
 		case domain.ProviderDiscord:
-			p = social.NewDiscordProvider(pcfg.ClientID, pcfg.ClientSecret, pcfg.Scopes)
+			p = social.NewDiscordProviderWithGuilds(pcfg.ClientID, pcfg.ClientSecret, pcfg.Scopes, pcfg.GuildIDs)
 		case domain.ProviderMicrosoft:
 			p = social.NewMicrosoftProvider(pcfg.ClientID, pcfg.ClientSecret, "", pcfg.Scopes)
 		case domain.ProviderQQ:
@@ -410,9 +410,9 @@ func seedProviders(ctx context.Context, repo port.ProviderConfigRepository) {
 
 func seedSettings(ctx context.Context, repo port.SettingsRepository, cfg *config.Config) {
 	defaults := map[string]string{
-		"site_url":                                  defaultSiteURL(cfg),
-		"github_url":                                "https://github.com/Luotianyi-0712/OpenOIDC",
-		"contact_info":                              "",
+		"site_url":             defaultSiteURL(cfg),
+		"github_url":           "https://github.com/Luotianyi-0712/OpenOIDC",
+		"contact_info":         "",
 		"registration_enabled": "true",
 		"registration_email_verification_required": "true",
 		"password_login_enabled":                   "true",

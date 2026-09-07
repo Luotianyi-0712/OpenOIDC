@@ -15,6 +15,8 @@ type ConditionType =
   | 'provider_raw_number'
   | 'provider_raw_string'
   | 'provider_raw_bool'
+  | 'discord_guild_member'
+  | 'discord_guild_age_days'
   | 'user_email_domain'
   | 'user_created_age_days'
   | 'user_has_verified_email'
@@ -71,6 +73,7 @@ const emit = defineEmits<{
 }>()
 
 const isGroup = computed(() => !!props.item.group)
+const isDiscordGuild = computed(() => props.item.condition?.type === 'discord_guild_member' || props.item.condition?.type === 'discord_guild_age_days')
 
 function toggleType() {
   if (isGroup.value) {
@@ -172,6 +175,8 @@ function onTypeChange(newType: ConditionType) {
     operator: option.operatorType === 'number' ? 'gte' : option.operatorType === 'bool' ? 'eq' : 'eq',
     value: option.valueType === 'number' ? 0 : option.valueType === 'bool' ? true : '',
     values: option.valueType === 'domains' ? [] : undefined,
+    min_days: undefined,
+    min_binding_days: undefined,
   })
 }
 
@@ -185,13 +190,14 @@ function onProviderChange() {
 
 function operatorOptions(cond?: RuleCondition): string[] {
   const option = conditionOption(cond?.type)
-  if (option.operatorType === 'number') return ['eq', 'ne', 'gt', 'gte', 'lt', 'lte']
+  if (option.operatorType === 'number') return ['eq', 'neq', 'gt', 'gte', 'lt', 'lte']
   if (option.operatorType === 'string') return ['eq', 'ne', 'contains', 'starts_with', 'ends_with']
-  if (option.operatorType === 'bool') return ['eq', 'ne']
+  if (option.operatorType === 'bool') return ['eq', 'neq']
   return []
 }
 
 function fieldOptions(cond?: RuleCondition): FieldOption[] {
+  if (cond?.type === 'discord_guild_member' || cond?.type === 'discord_guild_age_days') return []
   const provider = cond?.provider?.toLowerCase()
   if (!provider) return []
 
@@ -356,12 +362,13 @@ function handleValuesInput(event: Event) {
         </div>
 
         <div v-if="conditionOption(item.condition.type).needsField">
-          <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.field') }}</label>
+          <label class="block text-xs text-muted-foreground mb-1">{{ isDiscordGuild ? $t('adminRules.guildId') : $t('adminRules.field') }}</label>
           <input
             :value="item.condition.field"
             @input="updateCondition({ field: ($event.target as HTMLInputElement).value })"
             :list="`field-options-${index}-${depth}`"
-            :placeholder="$t('adminRules.fieldPlaceholder')"
+            :placeholder="isDiscordGuild ? $t('adminRules.guildId') : $t('adminRules.fieldPlaceholder')"
+            :inputmode="isDiscordGuild ? 'numeric' : undefined"
             class="w-full px-2 py-1.5 border border-border rounded-lg text-sm"
           />
           <datalist :id="`field-options-${index}-${depth}`">
@@ -387,7 +394,7 @@ function handleValuesInput(event: Event) {
         <div v-if="conditionOption(item.condition.type).valueType === 'number'">
           <label class="block text-xs text-muted-foreground mb-1">{{ $t('adminRules.value') }}</label>
           <input
-            :value="item.condition.value"
+            :value="item.condition.value ?? item.condition.min_days ?? item.condition.min_binding_days ?? 0"
             @input="updateCondition({ value: Number(($event.target as HTMLInputElement).value) })"
             type="number"
             min="0"

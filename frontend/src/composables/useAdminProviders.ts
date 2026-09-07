@@ -24,6 +24,7 @@ export interface Provider {
   token_endpoint?: string
   userinfo_endpoint?: string
   scopes?: string[]
+  guild_ids?: string[]
   user_id_field?: string
   email_field?: string
   name_field?: string
@@ -67,6 +68,7 @@ export type ProviderFormKey =
   | 'token_endpoint'
   | 'userinfo_endpoint'
   | 'scopes'
+  | 'guild_ids'
   | 'user_id_field'
   | 'email_field'
   | 'name_field'
@@ -157,6 +159,7 @@ export const providerMeta: Record<string, ProviderMeta> = {
       { key: 'client_id', label: 'Client ID', type: 'text' },
       { key: 'client_secret', label: 'Client Secret', type: 'password' },
       { key: 'scopes', label: 'Scopes', type: 'text', placeholder: 'identify email guilds connections' },
+      { key: 'guild_ids', label: 'Guild IDs', type: 'text' },
     ],
     callbackPath: '/api/v1/social/discord/callback',
   },
@@ -247,6 +250,7 @@ const emptyForm = (): ProviderForm => ({
   token_endpoint: '',
   userinfo_endpoint: '',
   scopes: '',
+  guild_ids: '',
   user_id_field: 'id',
   email_field: 'email',
   name_field: 'name',
@@ -310,6 +314,7 @@ function fillFormFromProvider(form: ProviderForm, provider: Provider) {
   next.token_endpoint = provider.token_endpoint ?? ''
   next.userinfo_endpoint = provider.userinfo_endpoint ?? ''
   next.scopes = normalizeScopes(provider.scopes)
+  next.guild_ids = normalizeScopes(provider.guild_ids)
   next.user_id_field = provider.user_id_field || 'id'
   next.email_field = provider.email_field || 'email'
   next.name_field = provider.name_field || 'name'
@@ -334,6 +339,8 @@ function providerPayload(form: ProviderForm, fields: FieldDef[], includeCustomOA
   for (const field of fields) {
     if (field.key === 'scopes') {
       payload.scopes = splitScopes(stringValue(form.scopes))
+    } else if (field.key === 'guild_ids') {
+      payload.guild_ids = splitScopes(stringValue(form.guild_ids))
     } else {
       addString(payload, field.key, form[field.key])
     }

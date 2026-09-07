@@ -122,6 +122,7 @@ type ProviderOAuth2Config struct {
 	PrivateKey   string   `mapstructure:"private_key"`
 	Tenant       string   `mapstructure:"tenant"`
 	Scopes       []string `mapstructure:"scopes"`
+	GuildIDs     []string `mapstructure:"guild_ids"`
 	RedirectPath string   `mapstructure:"redirect_path"`
 }
 

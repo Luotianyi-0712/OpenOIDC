@@ -24,6 +24,8 @@ const (
 	ConditionProviderRawNumber      RuleConditionType = "provider_raw_number"
 	ConditionProviderRawString      RuleConditionType = "provider_raw_string"
 	ConditionProviderRawBool        RuleConditionType = "provider_raw_bool"
+	ConditionDiscordGuildMember     RuleConditionType = "discord_guild_member"
+	ConditionDiscordGuildAgeDays    RuleConditionType = "discord_guild_age_days"
 	ConditionUserEmailDomain        RuleConditionType = "user_email_domain"
 	ConditionUserCreatedAgeDays     RuleConditionType = "user_created_age_days"
 	ConditionUserHasVerifiedEmail   RuleConditionType = "user_has_verified_email"
@@ -42,8 +44,8 @@ type RuleCondition struct {
 
 // ConditionItem can be either a RuleCondition or a nested ConditionGroup
 type ConditionItem struct {
-	Condition *RuleCondition   `json:"condition,omitempty"`
-	Group     *ConditionGroup  `json:"group,omitempty"`
+	Condition *RuleCondition  `json:"condition,omitempty"`
+	Group     *ConditionGroup `json:"group,omitempty"`
 }
 
 type ConditionGroup struct {
@@ -53,7 +55,7 @@ type ConditionGroup struct {
 
 type RuleConditions struct {
 	Operator   RuleOperator    `json:"operator"`
-	Conditions []RuleCondition `json:"rules"` // Keep for backward compatibility
+	Conditions []RuleCondition `json:"rules"`           // Keep for backward compatibility
 	Items      []ConditionItem `json:"items,omitempty"` // New nested structure
 }
 

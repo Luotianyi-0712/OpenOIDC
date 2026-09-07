@@ -363,6 +363,13 @@ func (s *AdminService) CreateProvider(ctx context.Context, pc *domain.ProviderCo
 }
 
 func (s *AdminService) UpdateProvider(ctx context.Context, pc *domain.ProviderConfig) error {
+	if pc.Provider == domain.ProviderDiscord {
+		for _, id := range pc.DiscordGuildIDs() {
+			if !domain.IsDiscordGuildID(id) {
+				return fmt.Errorf("%w: invalid Discord Guild ID %q", ErrInvalidInput, id)
+			}
+		}
+	}
 	if !domain.IsValidProvider(pc.Provider) {
 		return fmt.Errorf("%w: unknown provider", ErrInvalidInput)
 	}

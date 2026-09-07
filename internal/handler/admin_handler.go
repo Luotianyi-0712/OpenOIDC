@@ -943,6 +943,7 @@ type updateProviderRequest struct {
 	UserInfoURL           *string  `json:"userinfo_url"`
 	UserInfoEndpoint      *string  `json:"userinfo_endpoint"`
 	Scopes                []string `json:"scopes"`
+	GuildIDs              []string `json:"guild_ids"`
 	RedirectPath          *string  `json:"redirect_path"`
 	UserIDPath            *string  `json:"user_id_path"`
 	UserIDField           *string  `json:"user_id_field"`
@@ -1145,6 +1146,9 @@ func applyProviderRequest(pc *domain.ProviderConfig, req updateProviderRequest) 
 		pc.Scopes = cleanProviderStringSlice(req.Scopes)
 		setProviderExtra(pc, "scopes", pc.Scopes)
 	}
+	if req.GuildIDs != nil {
+		setProviderExtra(pc, "guild_ids", cleanProviderStringSlice(req.GuildIDs))
+	}
 }
 
 func setProviderExtra(pc *domain.ProviderConfig, key string, value any) {
@@ -1249,6 +1253,9 @@ func providerPayload(pc *domain.ProviderConfig) map[string]any {
 	}
 	if len(pc.Scopes) > 0 {
 		m["scopes"] = pc.Scopes
+	}
+	if pc.Provider == domain.ProviderDiscord {
+		m["guild_ids"] = pc.DiscordGuildIDs()
 	}
 	if pc.RedirectPath != "" {
 		m["redirect_path"] = pc.RedirectPath

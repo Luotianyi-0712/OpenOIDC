@@ -550,11 +550,20 @@ func (s *SocialService) SyncAuthorizationStatus(ctx context.Context, limit int, 
 		if err := s.checkAuthorization(ctx, binding); err != nil {
 			return err
 		}
+		if binding.Provider == domain.ProviderDiscord && s.securitySvc != nil {
+			if _, err := s.securitySvc.ComputeSecurityLevel(ctx, binding.UserID); err != nil {
+				return fmt.Errorf("recompute Discord member security level: %w", err)
+			}
+		}
 	}
 	return nil
 }
 
 func (s *SocialService) checkAuthorization(ctx context.Context, binding *domain.SocialBinding) error {
+	// Never preserve old guild membership when refreshing Discord data fails.
+	if binding.Provider == domain.ProviderDiscord {
+		delete(binding.RawProfile, "guilds")
+	}
 	prov, err := s.registry.Get(binding.Provider)
 	now := time.Now().UTC()
 	if err != nil || !s.registry.IsEnabled(binding.Provider) {
@@ -580,10 +589,12 @@ func (s *SocialService) checkAuthorization(ctx context.Context, binding *domain.
 			return s.markAuthorizationUnknown(ctx, binding, refreshErr)
 		}
 		s.applyToken(binding, token)
-		binding.LastAuthCheckAt = &now
-		binding.LastAuthStatus = domain.SocialAuthStatusActive
-		binding.LastAuthError = nil
-		return s.bindingRepo.Update(ctx, binding)
+		if binding.Provider != domain.ProviderDiscord {
+			binding.LastAuthCheckAt = &now
+			binding.LastAuthStatus = domain.SocialAuthStatusActive
+			binding.LastAuthError = nil
+			return s.bindingRepo.Update(ctx, binding)
+		}
 	}
 
 	if binding.AccessToken == nil || *binding.AccessToken == "" {
@@ -611,6 +622,9 @@ func (s *SocialService) checkAuthorization(ctx context.Context, binding *domain.
 			return s.markAuthorizationLost(ctx, binding, status, authStatus, validateErr)
 		}
 		return s.markAuthorizationUnknown(ctx, binding, validateErr)
+	}
+	if info == nil || info.ProviderUID != binding.ProviderUID {
+		return s.markAuthorizationUnknown(ctx, binding, fmt.Errorf("provider user identity mismatch"))
 	}
 	s.applyProviderSnapshot(binding, info)
 	binding.LastAuthCheckAt = &now

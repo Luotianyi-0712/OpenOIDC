@@ -17,6 +17,8 @@ type ConditionType =
   | 'provider_raw_number'
   | 'provider_raw_string'
   | 'provider_raw_bool'
+  | 'discord_guild_member'
+  | 'discord_guild_age_days'
   | 'user_email_domain'
   | 'user_created_age_days'
   | 'user_has_verified_email'
@@ -134,6 +136,8 @@ const conditionOptions: ConditionOption[] = [
   { type: 'provider_raw_number', valueType: 'number', operatorType: 'number', needsProvider: true, needsField: true },
   { type: 'provider_raw_string', valueType: 'string', operatorType: 'string', needsProvider: true, needsField: true },
   { type: 'provider_raw_bool', valueType: 'bool', operatorType: 'bool', needsProvider: true, needsField: true },
+  { type: 'discord_guild_member', valueType: 'bool', operatorType: 'bool', needsField: true },
+  { type: 'discord_guild_age_days', valueType: 'number', operatorType: 'number', needsField: true },
   { type: 'user_email_domain', valueType: 'domains' },
   { type: 'user_created_age_days', valueType: 'number', operatorType: 'number' },
   { type: 'user_has_verified_email', valueType: 'bool', operatorType: 'bool' },
@@ -392,6 +396,7 @@ function onProviderChange(cond: RuleCondition) {
 }
 
 function defaultFieldForCondition(cond: RuleCondition) {
+  if (cond.type === 'discord_guild_member' || cond.type === 'discord_guild_age_days') return ''
   if (cond.type === 'provider_account_age_days') return 'created_at'
   const fields = fieldOptions(cond)
   const expectedType = cond.type === 'provider_raw_number' ? 'number' : cond.type === 'provider_raw_bool' ? 'bool' : 'string'
@@ -451,7 +456,7 @@ function buildConditionPayload(cond: RuleCondition): RuleCondition {
     payload.min_binding_days = payload.min_days
     return payload
   }
-  if (copy.type === 'provider_account_age_days' || copy.type === 'user_created_age_days') {
+  if (copy.type === 'provider_account_age_days' || copy.type === 'user_created_age_days' || copy.type === 'discord_guild_age_days') {
     payload.min_days = Number(copy.value ?? copy.min_days ?? 0)
     return payload
   }
@@ -685,6 +690,8 @@ function conditionLabel(condition: RuleCondition) {
   const cond = normalizeConditionForEdit(condition)
   const provider = providerLabel(cond.provider)
   const typeLabel = t(`adminRules.conditionTypes.${cond.type}`)
+  if (cond.type === 'discord_guild_member') return `${typeLabel} ${cond.field} ${operatorLabel(cond.operator)} ${formatValue(cond)}`
+  if (cond.type === 'discord_guild_age_days') return `${typeLabel} ${cond.field} ${operatorLabel(cond.operator)} ${cond.min_days ?? cond.value ?? 0}${t('adminRules.days')}`
   if (cond.type === 'provider_bound') return cond.provider ? `${provider}` : t('adminRules.anyProvider')
   if (cond.type === 'binding_age_days') return `${provider} ${t('adminRules.boundDays')} ${operatorLabel(cond.operator)} ${cond.min_days ?? cond.min_binding_days ?? cond.value ?? 0}${t('adminRules.days')}`
   if (cond.type === 'provider_account_age_days') return `${provider} ${fieldLabel(cond)} ${operatorLabel(cond.operator)} ${cond.min_days ?? cond.value ?? 0}${t('adminRules.days')}`
