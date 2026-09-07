@@ -1,4 +1,17 @@
 export default {
+  announcements: {
+    title: 'Announcements', notifications: 'Notifications', unreadCount: '{count} unread announcements', unread: 'Unread',
+    empty: 'No announcements', emptyAdmin: 'No announcements yet', create: 'New announcement', edit: 'Edit announcement',
+    subject: 'Title', content: 'Content (Markdown)', displayMode: 'Display mode',
+    modes: { banner: 'Top banner', modal: 'Notification window', both: 'Both' },
+    dismissible: 'Allow banner dismissal', scrolling: 'Scrolling banner', published: 'Published', draft: 'Draft',
+    publish: 'Publish', unpublish: 'Unpublish', write: 'Write', preview: 'Preview',
+    status: 'Status', updatedAt: 'Updated', actions: 'Actions',
+    markAllRead: 'Mark all as read', view: 'View announcement', dismiss: 'Dismiss banner', close: 'Close notifications',
+    back: 'Back to announcements', previous: 'Previous announcement', next: 'Next announcement', pause: 'Pause scrolling', resume: 'Resume scrolling',
+    loadError: 'Could not load announcements', retry: 'Retry', saved: 'Announcement saved', deleted: 'Announcement deleted',
+    deleteConfirm: 'Delete announcement "{title}"?', contentTooLong: 'Content must not exceed 64 KB',
+  },
   // Common
   save: 'Save',
   cancel: 'Cancel',

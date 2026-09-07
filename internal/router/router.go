@@ -15,22 +15,23 @@ import (
 )
 
 type Deps struct {
-	AuthHandler      *handler.AuthHandler
-	SocialHandler    *handler.SocialHandler
-	OIDCHandler      *handler.OIDCHandler
-	UserInfoHandler  *handler.UserInfoHandler
-	AdminHandler     *handler.AdminHandler
-	DeveloperHandler *handler.DeveloperHandler
-	WellKnownHandler *handler.WellKnownHandler
-	HealthHandler    *handler.HealthHandler
-	PasskeyHandler   *handler.PasskeyHandler
-	SessionService   *service.SessionService
-	UserRepo         port.UserRepository
-	SettingsRepo     port.SettingsRepository
-	Cache            port.Cache
-	AllowedOrigins   []string
-	CookieName       string
-	SPAFS            fs.FS
+	AuthHandler         *handler.AuthHandler
+	SocialHandler       *handler.SocialHandler
+	OIDCHandler         *handler.OIDCHandler
+	UserInfoHandler     *handler.UserInfoHandler
+	AdminHandler        *handler.AdminHandler
+	DeveloperHandler    *handler.DeveloperHandler
+	WellKnownHandler    *handler.WellKnownHandler
+	HealthHandler       *handler.HealthHandler
+	PasskeyHandler      *handler.PasskeyHandler
+	AnnouncementHandler *handler.AnnouncementHandler
+	SessionService      *service.SessionService
+	UserRepo            port.UserRepository
+	SettingsRepo        port.SettingsRepository
+	Cache               port.Cache
+	AllowedOrigins      []string
+	CookieName          string
+	SPAFS               fs.FS
 }
 
 func NewRouter(d Deps) *chi.Mux {
@@ -69,6 +70,7 @@ func NewRouter(d Deps) *chi.Mux {
 		// Public settings (login/registration config).
 		r.Get("/settings/public", d.AdminHandler.PublicSettings)
 		r.Get("/settings/password-policy", d.AdminHandler.PasswordPolicy)
+		r.Get("/announcements", d.AnnouncementHandler.PublicList)
 
 		// Auth (public, but rate limited).
 		r.Route("/auth", func(r chi.Router) {
@@ -155,6 +157,11 @@ func NewRouter(d Deps) *chi.Mux {
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(mw.SessionAuth(d.SessionService, d.CookieName))
 			r.Use(mw.AdminOnly(d.UserRepo))
+
+			r.Get("/announcements", d.AnnouncementHandler.AdminList)
+			r.Post("/announcements", d.AnnouncementHandler.Create)
+			r.Put("/announcements/{id}", d.AnnouncementHandler.Update)
+			r.Delete("/announcements/{id}", d.AnnouncementHandler.Delete)
 
 			r.Get("/users", d.AdminHandler.ListUsers)
 			r.Post("/users", d.AdminHandler.CreateUser)

@@ -61,6 +61,7 @@ const router = createRouter({
         { path: 'clients', component: () => import('@/pages/admin/clients.vue') },
         { path: 'security-rules', component: () => import('@/pages/admin/security-rules.vue') },
         { path: 'providers', component: () => import('@/pages/admin/providers.vue') },
+        { path: 'announcements', component: () => import('@/pages/admin/announcements.vue') },
         { path: 'settings', component: () => import('@/pages/admin/settings.vue') },
         { path: 'audit', component: () => import('@/pages/admin/audit.vue') },
         { path: 'keys', component: () => import('@/pages/admin/keys.vue') },

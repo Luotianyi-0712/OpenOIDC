@@ -1,4 +1,17 @@
 export default {
+  announcements: {
+    title: '公告', notifications: '通知公告', unreadCount: '{count} 条未读公告', unread: '未读',
+    empty: '暂无通知公告', emptyAdmin: '暂无公告', create: '新建公告', edit: '编辑公告',
+    subject: '标题', content: '正文（Markdown）', displayMode: '展示方式',
+    modes: { banner: '顶部横幅', modal: '通知小窗', both: '两者' },
+    dismissible: '允许关闭横幅', scrolling: '滚动横幅', published: '已发布', draft: '草稿',
+    publish: '发布', unpublish: '撤下', write: '编辑', preview: '预览',
+    status: '状态', updatedAt: '更新时间', actions: '操作',
+    markAllRead: '全部标为已读', view: '查看公告', dismiss: '关闭横幅', close: '关闭通知',
+    back: '返回公告列表', previous: '上一条公告', next: '下一条公告', pause: '暂停滚动', resume: '继续滚动',
+    loadError: '公告加载失败', retry: '重试', saved: '公告已保存', deleted: '公告已删除',
+    deleteConfirm: '确定删除公告“{title}”吗？', contentTooLong: '正文不能超过 64 KB',
+  },
   // Common
   save: '保存',
   cancel: '取消',

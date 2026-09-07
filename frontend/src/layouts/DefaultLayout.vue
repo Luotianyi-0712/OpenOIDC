@@ -5,10 +5,13 @@ import { Fingerprint, Menu, X, ChevronDown, Github, Mail } from 'lucide-vue-next
 import { ref, reactive, onMounted } from 'vue'
 import { setLocale, currentLocale } from '@/i18n'
 import { usePublicConfig } from '@/composables/usePublicConfig'
+import AnnouncementHeader from '@/components/announcements/AnnouncementHeader.vue'
+import AnnouncementBell from '@/components/announcements/AnnouncementBell.vue'
 
 const auth = useAuthStore()
 const { settings } = usePublicConfig()
 const mobileOpen = ref(false)
+const headerHeight = ref(64)
 const locale = ref(currentLocale())
 
 onMounted(() => {
@@ -51,7 +54,8 @@ function toggleLocale() {
 
 <template>
   <div class="min-h-screen">
-    <nav class="fixed top-0 inset-x-0 z-50 bg-white/85 backdrop-blur-xl border-b border-border">
+    <AnnouncementHeader @resize="headerHeight = $event">
+    <nav>
       <div class="max-w-[1200px] mx-auto px-4 sm:px-6 md:px-10 h-16 flex items-center justify-between gap-3 relative">
         <!-- Brand -->
         <RouterLink to="/" class="flex items-center gap-2.5 font-bold text-lg tracking-tight shrink-0">
@@ -61,8 +65,8 @@ function toggleLocale() {
           OIDC
         </RouterLink>
 
-        <!-- Desktop nav dropdowns (centered) -->
-        <ul class="hidden md:flex items-center gap-6 absolute left-1/2 -translate-x-1/2">
+        <!-- Desktop nav dropdowns -->
+        <ul class="hidden lg:flex items-center gap-6 shrink-0">
           <!-- Product -->
           <li class="relative" @mouseenter="openDropdown('product')" @mouseleave="closeDropdown()">
             <button class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium py-2">
@@ -132,6 +136,7 @@ function toggleLocale() {
 
         <!-- Right-side items -->
         <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <AnnouncementBell />
           <template v-if="auth.isLoggedIn">
             <RouterLink to="/me" class="hidden sm:inline-flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-3 py-2">{{ $t('nav.account') }}</RouterLink>
             <RouterLink v-if="auth.canShowDeveloperConsole" to="/developer" class="hidden sm:inline-flex text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 lg:px-3 py-2">{{ $t('nav.developers') }}</RouterLink>
@@ -144,16 +149,17 @@ function toggleLocale() {
           <button @click="toggleLocale" class="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium px-2 py-1 rounded border border-border">
             {{ locale === 'zh' ? 'EN' : '中文' }}
           </button>
-          <button class="md:hidden p-2 rounded-md hover:bg-muted transition-colors" @click="mobileOpen = !mobileOpen">
+          <button class="lg:hidden p-2 rounded-md hover:bg-muted transition-colors" @click="mobileOpen = !mobileOpen">
             <X v-if="mobileOpen" class="w-5 h-5" />
             <Menu v-else class="w-5 h-5" />
           </button>
         </div>
       </div>
     </nav>
+    </AnnouncementHeader>
 
     <!-- Mobile menu overlay -->
-    <div v-if="mobileOpen" class="fixed inset-0 top-16 bg-white z-40 overflow-y-auto md:hidden">
+    <div v-if="mobileOpen" class="fixed inset-0 bg-white z-40 overflow-y-auto lg:hidden" :style="{ top: `${headerHeight}px` }">
       <div class="p-6 space-y-0">
         <!-- Product -->
         <div class="border-b border-border/50">
