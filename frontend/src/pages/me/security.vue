@@ -151,6 +151,10 @@ function conditionTitle(cond: MissingCondition): string {
   const provider = providerLabel(cond.provider || '')
   const type = cond.type || (cond.min_binding_days > 0 ? 'binding_age_days' : 'provider_bound')
   switch (type) {
+    case 'discord_guild_member':
+      return `${t('adminRules.conditionTypes.discord_guild_member')} ${cond.field || ''} ${operatorLabel(cond.operator)} ${cond.value === false ? t('no') : t('yes')}`
+    case 'discord_guild_age_days':
+      return `${t('adminRules.conditionTypes.discord_guild_age_days')} ${cond.field || ''} ${operatorLabel(cond.operator)} ${cond.min_binding_days || Number(cond.value) || 0} ${t('adminRules.days')}`
     case 'provider_bound':
       return cond.provider
         ? t('security.bindProvider', { provider })

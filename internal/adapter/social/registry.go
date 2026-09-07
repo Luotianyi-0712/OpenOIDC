@@ -176,7 +176,7 @@ func buildProvider(cfg *domain.ProviderConfig, clientID, clientSecret string) po
 	case domain.ProviderLinuxDO:
 		return NewLinuxDOProvider(clientID, clientSecret, cfg.Scopes)
 	case domain.ProviderDiscord:
-		return NewDiscordProvider(clientID, clientSecret, cfg.Scopes)
+		return NewDiscordProviderWithGuilds(clientID, clientSecret, cfg.Scopes, cfg.DiscordGuildIDs())
 	case domain.ProviderMicrosoft:
 		var tenantID string
 		if extra != nil {

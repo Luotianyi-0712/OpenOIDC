@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -104,6 +105,15 @@ type CustomOAuth2Config struct {
 	EmailPath  string
 	NamePath   string
 	AvatarPath string
+}
+
+func (pc *ProviderConfig) DiscordGuildIDs() []string {
+	return extraStringSlice(pc.ExtraConfig, "guild_ids")
+}
+
+func IsDiscordGuildID(id string) bool {
+	n, err := strconv.ParseUint(id, 10, 64)
+	return err == nil && n > 0 && strconv.FormatUint(n, 10) == id
 }
 
 func ProviderType(pc *ProviderConfig) string {

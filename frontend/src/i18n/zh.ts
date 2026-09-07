@@ -742,6 +742,8 @@ export default {
     convertToGroup: '转为条件组',
     convertToCondition: '转为条件',
     conditionTypes: {
+      discord_guild_member: 'Discord 服务器成员',
+      discord_guild_age_days: 'Discord 服务器加入天数',
       provider_bound: '已绑定平台',
       binding_age_days: '平台绑定天数',
       provider_account_age_days: '平台账号注册天数',
@@ -754,6 +756,7 @@ export default {
       user_created_age_days: '本地用户注册天数',
       user_has_verified_email: '本地用户邮箱已验证',
     },
+    guildId: 'Guild ID（服务器 ID）',
     providerOptions: {
       github: 'GitHub',
       google: 'Google',
@@ -777,6 +780,9 @@ export default {
       githubPublicRepos: 'GitHub public repos',
       githubPublicGists: 'GitHub public gists',
       googleHostedDomain: 'Google hosted domain',
+      googleHasPhone: 'Google 已绑定手机号',
+      googlePhoneVerified: 'Google 手机号已验证',
+      googlePhoneNumber: 'Google 手机号',
       discordMfaEnabled: 'Discord MFA',
       discordPublicFlags: 'Discord public flags',
       microsoftTenant: 'Microsoft tenant',
