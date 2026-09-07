@@ -268,6 +268,20 @@ func RunMigrations(db *sql.DB) error {
 		last_used_at DATETIME,
 		created_at DATETIME NOT NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS announcements (
+		id TEXT PRIMARY KEY,
+		title TEXT NOT NULL,
+		content TEXT NOT NULL,
+		display_mode TEXT NOT NULL CHECK (display_mode IN ('banner', 'modal', 'both')),
+		dismissible BOOLEAN NOT NULL DEFAULT 1,
+		scrolling BOOLEAN NOT NULL DEFAULT 0,
+		is_published BOOLEAN NOT NULL DEFAULT 0,
+		revision TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_announcements_published ON announcements (is_published, updated_at DESC);
 	`
 
 	_, err := db.Exec(schema)

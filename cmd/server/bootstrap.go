@@ -39,23 +39,24 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	cleanup := func() {}
 
 	var (
-		userRepo        port.UserRepository
-		bindingRepo     port.BindingRepository
-		clientRepo      port.ClientRepository
-		accessRuleRepo  port.ClientAccessRuleRepository
-		ruleRepo        port.RuleRepository
-		sessionRepo     port.SessionRepository
-		providerCfgRepo port.ProviderConfigRepository
-		auditRepo       port.AuditRepository
-		settingsRepo    port.SettingsRepository
-		aliasRepo       port.AliasRestrictionRepository
-		signingKeyRepo  port.SigningKeyRepository
-		riskReportRepo  port.RiskReportRepository
-		riskListRepo    port.RiskListRepository
-		consentRepo     port.ConsentRepository
-		passkeyRepo     port.PasskeyRepository
-		cache           port.Cache
-		fositeStore     fosite.Storage
+		userRepo         port.UserRepository
+		bindingRepo      port.BindingRepository
+		clientRepo       port.ClientRepository
+		accessRuleRepo   port.ClientAccessRuleRepository
+		ruleRepo         port.RuleRepository
+		sessionRepo      port.SessionRepository
+		providerCfgRepo  port.ProviderConfigRepository
+		auditRepo        port.AuditRepository
+		settingsRepo     port.SettingsRepository
+		aliasRepo        port.AliasRestrictionRepository
+		signingKeyRepo   port.SigningKeyRepository
+		riskReportRepo   port.RiskReportRepository
+		riskListRepo     port.RiskListRepository
+		consentRepo      port.ConsentRepository
+		passkeyRepo      port.PasskeyRepository
+		announcementRepo port.AnnouncementRepository
+		cache            port.Cache
+		fositeStore      fosite.Storage
 	)
 
 	secretCipher, err := service.NewSecretCipher(cfg.Secrets.ClientSecretEncryptionKey)
@@ -95,6 +96,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 		consentRepo = sqliteAdapter.NewConsentRepo(sqliteDB)
 		fositeStore = sqliteAdapter.NewFositeStore(sqliteDB, secretCipher)
 		passkeyRepo = sqliteAdapter.NewPasskeyRepo(sqliteDB)
+		announcementRepo = sqliteAdapter.NewAnnouncementRepo(sqliteDB)
 
 		mc := memcache.NewMemCache()
 		cleanup = chainCleanup(cleanup, func() { _ = mc.Close() })
@@ -140,6 +142,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 		consentRepo = postgres.NewConsentRepo(db)
 		fositeStore = postgres.NewFositeStore(db, secretCipher)
 		passkeyRepo = postgres.NewPasskeyRepo(db)
+		announcementRepo = postgres.NewAnnouncementRepo(db)
 	}
 	// settingsRepo is used by devHandler above.
 
@@ -197,6 +200,7 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	devHandler := handler.NewDeveloperHandler(clientSvc, riskSvc, userRepo, settingsRepo, consentRepo, cfg.Server.Issuer)
 	healthHandler := handler.NewHealthHandler(pgPool, redisClient)
 	passkeyHandler := handler.NewPasskeyHandler(passkeySvc, cfg.Session)
+	announcementHandler := handler.NewAnnouncementHandler(service.NewAnnouncementService(announcementRepo, auditRepo))
 
 	allowedOrigins := []string{"*"}
 	if v := os.Getenv("OIDC_ALLOWED_ORIGINS"); v != "" {
@@ -215,22 +219,23 @@ func bootstrap(ctx context.Context, cfg *config.Config) (router.Deps, func(), er
 	seedSettings(ctx, settingsRepo, cfg)
 
 	return router.Deps{
-		AuthHandler:      authHandler,
-		SocialHandler:    socialHandler,
-		OIDCHandler:      oidcHandler,
-		UserInfoHandler:  userInfoHandler,
-		AdminHandler:     adminHandler,
-		DeveloperHandler: devHandler,
-		WellKnownHandler: wellKnownHandler,
-		HealthHandler:    healthHandler,
-		PasskeyHandler:   passkeyHandler,
-		SessionService:   sessionSvc,
-		UserRepo:         userRepo,
-		SettingsRepo:     settingsRepo,
-		Cache:            cache,
-		AllowedOrigins:   allowedOrigins,
-		CookieName:       cfg.Session.CookieName,
-		SPAFS:            locateSPAFS(),
+		AuthHandler:         authHandler,
+		SocialHandler:       socialHandler,
+		OIDCHandler:         oidcHandler,
+		UserInfoHandler:     userInfoHandler,
+		AdminHandler:        adminHandler,
+		DeveloperHandler:    devHandler,
+		WellKnownHandler:    wellKnownHandler,
+		HealthHandler:       healthHandler,
+		PasskeyHandler:      passkeyHandler,
+		AnnouncementHandler: announcementHandler,
+		SessionService:      sessionSvc,
+		UserRepo:            userRepo,
+		SettingsRepo:        settingsRepo,
+		Cache:               cache,
+		AllowedOrigins:      allowedOrigins,
+		CookieName:          cfg.Session.CookieName,
+		SPAFS:               locateSPAFS(),
 	}, cleanup, nil
 }
 
