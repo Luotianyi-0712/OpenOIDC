@@ -30,7 +30,7 @@ func (r *ConsentRepo) ListAuthorizedApps(ctx context.Context, userID uuid.UUID) 
 			   SELECT client_id, subject, created_at FROM oauth2_refresh_tokens WHERE active = true
 			 ) auth
 			 JOIN oidc_clients oc ON oc.client_id = auth.client_id
-			 LEFT JOIN users u ON u.id = oc.owner_user_id
+			 LEFT JOIN users u ON u.id = oc.owner_id
 			 WHERE auth.subject = $1
 			 ORDER BY auth.client_id, auth.created_at ASC`,
 		userID.String())
