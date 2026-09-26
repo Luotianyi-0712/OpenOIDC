@@ -1292,6 +1292,7 @@ export default {
     provider: 'Provider',
     providerUid: 'Provider UID',
     providerName: 'Provider Name',
+    providerUsername: 'Username',
     authStatus: 'Auth Status',
     boundAt: 'Bound At',
     revokeSession: 'Sign out',

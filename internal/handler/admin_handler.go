@@ -1031,6 +1031,37 @@ func (h *AdminHandler) reloadSocialRegistry(ctx context.Context) {
 	}
 }
 
+// platformUsername extracts the provider-native username/handle from a binding's
+// raw profile snapshot. Unlike provider_name (a display name), this returns the
+// actual account handle: GitHub's "login", Discord's "username", etc.
+func platformUsername(b *domain.SocialBinding) string {
+	if b == nil || b.RawProfile == nil {
+		return ""
+	}
+	get := func(key string) string {
+		if v, ok := b.RawProfile[key].(string); ok {
+			return strings.TrimSpace(v)
+		}
+		return ""
+	}
+	switch b.Provider {
+	case domain.ProviderGitHub, domain.ProviderGitee:
+		return get("login")
+	case domain.ProviderDiscord:
+		name := get("username")
+		if disc := get("discriminator"); name != "" && disc != "" && disc != "0" {
+			return name + "#" + disc
+		}
+		return name
+	default:
+		// Best-effort fallback for other providers that expose a username field.
+		if v := get("username"); v != "" {
+			return v
+		}
+		return get("login")
+	}
+}
+
 func applyProviderRequest(pc *domain.ProviderConfig, req updateProviderRequest) {
 	if req.Enabled != nil {
 		pc.IsEnabled = *req.Enabled
@@ -1913,6 +1944,7 @@ func (h *AdminHandler) GetUserDetail(w http.ResponseWriter, r *http.Request) {
 					"provider_uid":       b.ProviderUID,
 					"provider_email":     b.ProviderEmail,
 					"provider_name":      b.ProviderName,
+					"provider_username":  platformUsername(b),
 					"provider_avatar":    b.ProviderAvatar,
 					"status":             b.Status,
 					"bound_at":           b.BoundAt,

@@ -1290,6 +1290,7 @@ export default {
     provider: '平台',
     providerUid: '平台 UID',
     providerName: '平台名称',
+    providerUsername: '平台用户名',
     authStatus: '授权状态',
     boundAt: '绑定时间',
     revokeSession: '踢下线',

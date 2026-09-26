@@ -54,6 +54,7 @@ interface UserBinding {
   provider_uid: string
   provider_email?: string
   provider_name?: string
+  provider_username?: string
   provider_avatar?: string
   status: string
   bound_at: string
@@ -796,6 +797,7 @@ function roleLabel(role?: string) {
                     <td class="px-3 py-2 font-mono text-xs">{{ binding.provider }}</td>
                     <td class="px-3 py-2 text-xs">
                       <div>{{ binding.provider_name || binding.provider_uid }}</div>
+                      <div v-if="binding.provider_username" class="font-mono text-muted-foreground">@{{ binding.provider_username }}</div>
                       <div class="text-muted-foreground">{{ binding.provider_email || '-' }}</div>
                     </td>
                     <td class="px-3 py-2 text-xs">
@@ -821,6 +823,7 @@ function roleLabel(role?: string) {
                   <span class="px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{{ binding.last_auth_status || binding.status }}</span>
                 </div>
                 <div class="break-words">{{ binding.provider_name || binding.provider_uid }}</div>
+                <div v-if="binding.provider_username" class="font-mono text-muted-foreground break-all">@{{ binding.provider_username }}</div>
                 <div class="text-muted-foreground break-all">{{ binding.provider_email || '-' }}</div>
                 <div v-if="binding.last_auth_error" class="text-destructive break-words">{{ binding.last_auth_error }}</div>
                 <div class="text-muted-foreground"><span class="font-medium text-foreground">{{ $t('adminUserDetail.boundAt') }}：</span>{{ formatDate(binding.bound_at) }}</div>
